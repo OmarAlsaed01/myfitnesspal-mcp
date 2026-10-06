@@ -152,6 +152,10 @@ async def fitness_get_day(
     vitamin_c, calcium, and iron (% daily value). Diary entries carry the
     same ones.
 
+    `goals` are the day's MyFitnessPal targets (calories, protein, carbs, fat)
+    and `remaining` is goal minus what is logged (negative: over the goal);
+    null where MyFitnessPal has no goal.
+
     date: YYYY-MM-DD (default: today).
     all_nutrients: also fetch the day totals of those 13 nutrients that the
     Diary Settings hide, one request per nutrient (a few seconds), for days
@@ -645,8 +649,9 @@ async def fitness_bulk_export(
     ctx: Context = None,
 ) -> dict:
     """Export a whole date range at once for analysis: per-day nutrition
-    totals, food entries with macros, the MyFitnessPal daily note, and local
-    feel notes. Read-only. Nutrition fields and units match fitness_get_day.
+    totals, goals and remaining, food entries with macros, the MyFitnessPal
+    daily note, and local feel notes. Read-only. Nutrition fields and units
+    match fitness_get_day.
 
     start/end: YYYY-MM-DD (default: last 30 days ending today).
     sync_first: gap-fill from MyFitnessPal before exporting. Off by default so

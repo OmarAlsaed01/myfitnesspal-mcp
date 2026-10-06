@@ -36,6 +36,9 @@ All notable changes to this project are documented here. The format follows
   replacement picked from a draft has always been remembered for that query.
   The tool description now says so, and `pin=False` replaces the entry
   without touching your remembered foods.
+- Day records (`fitness_get_day`, the `day` in write results, and
+  `fitness_bulk_export`) include `goals` (calories, protein, carbs, fat) and
+  `remaining` (goal minus logged; negative means over the goal).
 
 ### Changed
 
@@ -66,6 +69,11 @@ All notable changes to this project are documented here. The format follows
   grams by itself: to log 228 g, pick a gram serving and divide (2.28 with
   "100 g", 228 with "1 g"). Before, a model could log 228 servings when the user meant
   228 g.
+- The cache database gains three `day_nutrition` columns (`goal_protein`,
+  `goal_carbs`, `goal_fat`), added in place on first start. No refetch
+  happens on upgrade, so days cached by an earlier release show null
+  protein, carbs and fat goals in `fitness_bulk_export` until
+  `fitness_get_day` or a write refetches them.
 
 ### Fixed
 
