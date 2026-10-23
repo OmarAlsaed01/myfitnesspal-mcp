@@ -1,3 +1,4 @@
+import time
 from datetime import date
 from urllib import parse
 
@@ -5,6 +6,8 @@ from lxml import html as lh
 
 ORIGIN = "https://www.myfitnesspal.com"
 FORM_CONTENT_TYPE = "application/x-www-form-urlencoded; charset=UTF-8"
+# Only reads retry, since MFP writes aren't idempotent.
+RETRY_STATUSES = (429, 500, 502, 503, 504)
 
 
 def site_url(
@@ -43,6 +46,12 @@ def api_headers(client, extra: dict | None = None) -> dict:
     return headers
 
 
+def json_headers(client) -> dict:
+    return api_headers(
+        client, {"Accept": "application/json", "Content-Type": "application/json"}
+    )
+
+
 def form_headers(
     client, csrf: str, referer: str, accept: str | None = None
 ) -> dict[str, str]:
@@ -74,6 +83,19 @@ def get_page(client, url: str) -> tuple[lh.HtmlElement, str]:
     if not tokens:
         raise RuntimeError("couldn't read the MyFitnessPal csrf token")
     return doc, tokens[0]
+
+
+def get_with_retry(
+    client, url: str, *, params: dict | None = None, headers: dict | None = None
+):
+    attempts = 3
+    for attempt in range(attempts):
+        resp = client.session.get(url, params=params, headers=headers)
+        if resp.status_code not in RETRY_STATUSES or attempt == attempts - 1:
+            break
+        time.sleep(0.5 * (attempt + 1))
+    resp.raise_for_status()
+    return resp
 
 
 def get_json(client, url: str) -> dict | None:

@@ -1,7 +1,7 @@
 import logging
 from datetime import date
 
-from .mfp_web import api_headers, api_url, get_json, require_status
+from .mfp_web import api_url, get_json, json_headers, require_status
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +49,7 @@ def set_weight(client, day: date, value: float) -> dict:
     resp = client.session.post(
         api_url(client, "v2/measurements"),
         json={"items": [{"type": "Weight", "value": value, "date": day.isoformat()}]},
-        headers=api_headers(
-            client, {"Accept": "application/json", "Content-Type": "application/json"}
-        ),
+        headers=json_headers(client),
     )
     require_status(resp, "/v2/measurements", (200, 201))
     item = resp.json()["items"][0]

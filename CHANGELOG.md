@@ -51,6 +51,10 @@ All notable changes to this project are documented here. The format follows
   nutrient goals, with `remaining` for each once the day's total is known.
   They're fetched about once per goal period and cached in a new
   `goal_period` table.
+- `fitness_list_custom` lists your custom foods, saved meals and recipes
+  with their ids, servings and nutrition, and `fitness_log_custom` logs one
+  by name (a saved meal logs as its ingredients). None of these show up in
+  food search.
 - Food log results include `added_entries`: the diary entries MyFitnessPal
   actually added, read back from the diary.
 
