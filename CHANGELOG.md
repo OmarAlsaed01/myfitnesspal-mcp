@@ -51,6 +51,8 @@ All notable changes to this project are documented here. The format follows
   nutrient goals, with `remaining` for each once the day's total is known.
   They're fetched about once per goal period and cached in a new
   `goal_period` table.
+- Food log results include `added_entries`: the diary entries MyFitnessPal
+  actually added, read back from the diary.
 
 ### Changed
 
@@ -86,6 +88,14 @@ All notable changes to this project are documented here. The format follows
   happens on upgrade, so days cached by an earlier release show null
   protein, carbs and fat goals in `fitness_bulk_export` until
   `fitness_get_day` or a write refetches them.
+- A food log that adds nothing to the diary now fails with an error instead
+  of reporting success. MyFitnessPal answers `/food/add` with 200 for any
+  `food_id`/`weight_id`, so a stale or invented id used to look logged.
+  Each log reads the day's diary once more to check. When
+  `fitness_modify_food`'s replacement adds nothing, the error says the
+  original entry was already removed. When the read-back itself fails, the
+  log fails with an error that says the food may already be in the diary,
+  and the session refresh does not re-send the add.
 
 ### Fixed
 
