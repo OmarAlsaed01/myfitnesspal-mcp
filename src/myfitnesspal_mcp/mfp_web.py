@@ -21,6 +21,13 @@ def site_url(
     return f"{url}?{parse.urlencode(query, safe='/', quote_via=parse.quote)}"
 
 
+def api_url(client, path: str, *, params: dict | None = None) -> str:
+    url = parse.urljoin(client.BASE_API_URL, path)
+    if not params:
+        return url
+    return f"{url}?{parse.urlencode(params)}"
+
+
 # MFP has no write API, so these replicate what the web app's own JavaScript
 # sends: writes authenticate with the session's Bearer token plus the mfp-*
 # client headers, and form posts add the page csrf token (form_headers).

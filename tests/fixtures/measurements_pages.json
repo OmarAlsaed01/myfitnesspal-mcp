@@ -1,0 +1,38 @@
+[
+  {
+    "items": [
+      {
+        "id": "m-0003",
+        "type": "Weight",
+        "value": 180.4,
+        "date": "2026-07-08",
+        "unit": "pounds",
+        "updated_at": "2026-07-08T07:12:00Z"
+      },
+      {
+        "id": "m-0002",
+        "type": "Body Fat",
+        "value": 21.0,
+        "date": "2026-07-07",
+        "unit": "%",
+        "updated_at": "2026-07-07T07:05:00Z"
+      }
+    ],
+    "has_more": true,
+    "total_entries": 3
+  },
+  {
+    "items": [
+      {
+        "id": "m-0001",
+        "type": "Weight",
+        "value": 181,
+        "date": "2026-07-05",
+        "unit": "pounds",
+        "updated_at": "2026-07-05T06:58:00Z"
+      }
+    ],
+    "has_more": false,
+    "total_entries": 3
+  }
+]
