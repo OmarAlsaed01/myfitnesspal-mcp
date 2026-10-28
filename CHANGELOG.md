@@ -24,6 +24,16 @@ All notable changes to this project are documented here. The format follows
   also see 1 for a session that is about to lapse.
 - `cookies.json` now also holds MyFitnessPal's long-lived remember-me cookies
   next to the session token. The file's format is unchanged.
+- `fitness_delete_food` and `fitness_modify_food` now also return the updated
+  day under `day`, shaped like `fitness_get_day`, as `fitness_log_food`
+  already did, so a model doesn't need a follow-up `fitness_get_day` to see
+  the new totals. As with `fitness_log_food`, a modify that needs a choice
+  still returns the draft, whose `day` is its date string. All three tool
+  descriptions now say the day comes back.
+- When refreshing the day after a food write fails, `fitness_log_food`,
+  `fitness_delete_food`, and `fitness_modify_food` leave `day` out and return
+  only `refresh_warning`. `fitness_log_food` used to return the cached day
+  from before the write, which showed the change as if it hadn't happened.
 
 ### Fixed
 
