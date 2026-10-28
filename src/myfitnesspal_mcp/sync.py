@@ -3,8 +3,9 @@ import threading
 from contextlib import contextmanager
 from datetime import date, timedelta
 
-from . import config, notes
+from . import config, notes, nutrient_reports
 from .mfp_client import is_auth_error
+from .nutrients import EXTRA_NUTRIENTS, diary_column_nutrient
 from .store import Store
 
 logger = logging.getLogger(__name__)
@@ -48,12 +49,20 @@ def days_to_fetch(cached: set[str], lookback: int, today: date) -> list[date]:
     return [today] + [day for day in past if day.isoformat() not in cached]
 
 
-def macros(totals: dict) -> dict:
+def diary_nutrition(totals: dict) -> dict:
+    """Totals keyed by the diary page's column headers. Nutrients whose column
+    is hidden in MFP's Diary Settings come back None."""
+    extras = dict.fromkeys(EXTRA_NUTRIENTS)
+    for header, value in totals.items():
+        nutrient = diary_column_nutrient(header)
+        if nutrient is not None and extras[nutrient] is None:
+            extras[nutrient] = as_float(value)
     return {
         "calories": first_number(totals, "calories"),
         "protein": first_number(totals, "protein"),
         "carbs": first_number(totals, "carbohydrates", "carbs"),
         "fat": first_number(totals, "fat"),
+        **extras,
     }
 
 
@@ -63,7 +72,7 @@ def refresh_day(store: Store, client, day: date) -> None:
 
     store.upsert_nutrition(
         key,
-        **macros(mfp_day.totals),
+        **diary_nutrition(mfp_day.totals),
         water_ml=as_float(mfp_day.water),
         goal_calories=first_number(mfp_day.goals or {}, "calories"),
     )
@@ -71,7 +80,11 @@ def refresh_day(store: Store, client, day: date) -> None:
     store.replace_diary(
         key,
         [
-            {"meal": str(meal.name).title(), "name": entry.name, **macros(entry.totals)}
+            {
+                "meal": str(meal.name).title(),
+                "name": entry.name,
+                **diary_nutrition(entry.totals),
+            }
             for meal in mfp_day.meals
             for entry in meal.entries
         ],
@@ -81,6 +94,53 @@ def refresh_day(store: Store, client, day: date) -> None:
         store.set_note(key, notes.get_note(client, day))
 
     store.mark_diary_synced(key)
+
+
+def fill_hidden_nutrients(
+    store: Store,
+    client,
+    start: date,
+    end: date,
+    *,
+    nutrients: tuple[str, ...] = EXTRA_NUTRIENTS,
+    today: date | None = None,
+) -> list[str]:
+    """Fills the day totals the diary page didn't show from MFP's nutrient
+    reports: one request per nutrient still missing in [start, end], and none
+    for a nutrient the Diary Settings show. Returns the nutrients whose report
+    failed. Those are logged rather than raised, even when they look like auth
+    errors: the caller asked for extra data, and a report MFP won't serve
+    shouldn't cost the whole call a session refresh and a reconnect hint."""
+    today = today or date.today()
+    # Two short of the cap leaves room for the spare day daily_totals adds.
+    oldest = today - timedelta(days=nutrient_reports.MAX_LOOKBACK_DAYS - 2)
+    start = max(start, oldest)
+    failed: list[str] = []
+    if start > end:
+        return failed
+    for nutrient in nutrients:
+        missing = store.days_missing_nutrient(
+            nutrient, start.isoformat(), end.isoformat()
+        )
+        if not missing:
+            continue
+        try:
+            totals = nutrient_reports.daily_totals(
+                client, nutrient, date.fromisoformat(min(missing)), today
+            )
+        except Exception as exc:
+            logger.warning("%s report failed: %s", nutrient, exc)
+            failed.append(nutrient)
+            continue
+        store.fill_nutrient(
+            nutrient,
+            {
+                day.isoformat(): total
+                for day, total in totals.items()
+                if day.isoformat() in missing
+            },
+        )
+    return failed
 
 
 def poll(

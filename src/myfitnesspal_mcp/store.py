@@ -8,8 +8,11 @@ from pathlib import Path
 
 from . import config
 from .food_ranking import normalize_query
+from .nutrients import EXTRA_NUTRIENTS
 
-SCHEMA = """
+_EXTRA_NUTRIENT_COLUMNS = "".join(f",\n    {name} REAL" for name in EXTRA_NUTRIENTS)
+
+SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS day_nutrition (
     day TEXT PRIMARY KEY,
     calories REAL,
@@ -19,7 +22,7 @@ CREATE TABLE IF NOT EXISTS day_nutrition (
     water_ml REAL,
     weight REAL,
     goal_calories REAL,
-    diary_synced INTEGER NOT NULL DEFAULT 0
+    diary_synced INTEGER NOT NULL DEFAULT 0{_EXTRA_NUTRIENT_COLUMNS}
 );
 CREATE TABLE IF NOT EXISTS diary_entry (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +32,7 @@ CREATE TABLE IF NOT EXISTS diary_entry (
     calories REAL,
     protein REAL,
     carbs REAL,
-    fat REAL
+    fat REAL{_EXTRA_NUTRIENT_COLUMNS}
 );
 CREATE INDEX IF NOT EXISTS diary_entry_day ON diary_entry(day);
 CREATE TABLE IF NOT EXISTS feel_note (
@@ -70,6 +73,19 @@ NUTRITION_FIELDS = (
     "water_ml",
     "weight",
     "goal_calories",
+    *EXTRA_NUTRIENTS,
+)
+
+NUTRITION_COLUMNS = ("day", *NUTRITION_FIELDS)
+
+ENTRY_COLUMNS = (
+    "meal",
+    "name",
+    "calories",
+    "protein",
+    "carbs",
+    "fat",
+    *EXTRA_NUTRIENTS,
 )
 
 TREND_COLUMNS = {
@@ -78,6 +94,7 @@ TREND_COLUMNS = {
     "protein": "protein",
     "carbs": "carbs",
     "fat": "fat",
+    **{nutrient: nutrient for nutrient in EXTRA_NUTRIENTS},
 }
 
 
@@ -95,6 +112,23 @@ def trend_column(metric: str) -> str:
     if column is None:
         raise ValueError(f"unknown metric (use {' | '.join(TREND_COLUMNS)})")
     return column
+
+
+_LOGGED_DAY = "diary_synced = 1 AND calories IS NOT NULL"
+
+
+def _without_unknown_extras(row: sqlite3.Row) -> dict:
+    return {
+        column: value
+        for column, value in dict(row).items()
+        if value is not None or column not in EXTRA_NUTRIENTS
+    }
+
+
+def _extra_nutrient_column(nutrient: str) -> str:
+    if nutrient not in EXTRA_NUTRIENTS:
+        raise ValueError(f"unknown nutrient (use {' | '.join(EXTRA_NUTRIENTS)})")
+    return nutrient
 
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
@@ -141,6 +175,14 @@ class Store:
                 "OR goal_calories IS NOT NULL"
             )
             self.conn.commit()
+        for table in ("day_nutrition", "diary_entry"):
+            existing = {
+                row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")
+            }
+            for column in EXTRA_NUTRIENTS:
+                if column not in existing:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} REAL")
+        self.conn.commit()
 
     @_serialized
     def upsert_nutrition(self, day: str, **fields) -> None:
@@ -174,42 +216,61 @@ class Store:
 
     @_serialized
     def nutrition(self, day: str) -> dict | None:
+        """Unknown extra nutrients are left out, as on diary entries, so a
+        month of totals doesn't carry a dozen nulls a day."""
         row = self.conn.execute(
-            "SELECT day, calories, protein, carbs, fat, water_ml, weight, "
-            "goal_calories FROM day_nutrition WHERE day = ?",
+            f"SELECT {', '.join(NUTRITION_COLUMNS)} FROM day_nutrition WHERE day = ?",
             (day,),
         ).fetchone()
-        return _row_to_dict(row)
+        if row is None:
+            return None
+        return _without_unknown_extras(row)
+
+    @_serialized
+    def days_missing_nutrient(self, nutrient: str, start: str, end: str) -> set[str]:
+        """Synced days with food logged whose total for `nutrient` is unknown.
+        Days with nothing logged stay null rather than read as zero intake."""
+        column = _extra_nutrient_column(nutrient)
+        rows = self.conn.execute(
+            f"SELECT day FROM day_nutrition WHERE day >= ? AND day <= ? "
+            f"AND {_LOGGED_DAY} AND {column} IS NULL",
+            (start, end),
+        ).fetchall()
+        return {r["day"] for r in rows}
+
+    @_serialized
+    def fill_nutrient(self, nutrient: str, totals: dict[str, float]) -> None:
+        """Fills only unknown totals on logged days, so a value read off the
+        diary page wins, even one a refresh wrote after the report was read."""
+        column = _extra_nutrient_column(nutrient)
+        self.conn.executemany(
+            f"UPDATE day_nutrition SET {column} = ? "
+            f"WHERE day = ? AND {_LOGGED_DAY} AND {column} IS NULL",
+            [(total, day) for day, total in totals.items()],
+        )
+        self.conn.commit()
 
     @_serialized
     def replace_diary(self, day: str, entries: list[dict]) -> None:
         self.conn.execute("DELETE FROM diary_entry WHERE day = ?", (day,))
+        placeholders = ", ".join("?" for _ in ENTRY_COLUMNS)
         self.conn.executemany(
-            "INSERT INTO diary_entry (day, meal, name, calories, protein, carbs, fat) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-                (
-                    day,
-                    e.get("meal"),
-                    e.get("name"),
-                    e.get("calories"),
-                    e.get("protein"),
-                    e.get("carbs"),
-                    e.get("fat"),
-                )
-                for e in entries
-            ],
+            f"INSERT INTO diary_entry (day, {', '.join(ENTRY_COLUMNS)}) "
+            f"VALUES (?, {placeholders})",
+            [(day, *(e.get(column) for column in ENTRY_COLUMNS)) for e in entries],
         )
         self.conn.commit()
 
     @_serialized
     def diary(self, day: str) -> list[dict]:
+        """Entries list only the nutrients the diary page showed, so a day's
+        worth of entries doesn't carry a dozen nulls each."""
         rows = self.conn.execute(
-            "SELECT meal, name, calories, protein, carbs, fat FROM diary_entry "
+            f"SELECT {', '.join(ENTRY_COLUMNS)} FROM diary_entry "
             "WHERE day = ? ORDER BY id",
             (day,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_without_unknown_extras(row) for row in rows]
 
     @_serialized
     def set_feel(self, day: str, note: str | None, rating: int | None) -> dict:

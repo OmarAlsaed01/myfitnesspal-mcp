@@ -19,6 +19,7 @@ from . import (
     water,
 )
 from .food_ranking import MacroTargets
+from .nutrients import EXTRA_NUTRIENTS
 from .store import Store, trend_column
 
 mcp = FastMCP("myfitnesspal")
@@ -112,19 +113,50 @@ async def refresh_after_write(ctx: Context, day: datetime.date) -> dict:
     return {}
 
 
+def with_report_warning(response: dict, failed_reports: list[str]) -> dict:
+    """A failed report leaves its nutrient out, which would otherwise read the
+    same as a nutrient the Diary Settings hide."""
+    if not failed_reports:
+        return response
+    return {
+        **response,
+        "report_warning": (
+            f"couldn't read MyFitnessPal's reports for {', '.join(failed_reports)}, "
+            "so those totals are missing; try again later"
+        ),
+    }
+
+
 @mcp.tool(title="Get day summary", annotations=READS_MFP)
-async def fitness_get_day(date: str | None = None, ctx: Context = None) -> dict:
+async def fitness_get_day(
+    date: str | None = None, all_nutrients: bool = False, ctx: Context = None
+) -> dict:
     """Nutrition summary, diary entries, the MyFitnessPal daily note, and the
     local feel note for a day.
 
+    Nutrition totals carry calories (kcal) and protein, carbs, and fat (g),
+    plus whichever of these MyFitnessPal's Diary Settings show:
+    saturated_fat, polyunsaturated_fat, monounsaturated_fat, trans_fat,
+    fiber, and sugar (g); cholesterol, sodium, and potassium (mg); vitamin_a,
+    vitamin_c, calcium, and iron (% daily value). Diary entries carry the
+    same ones.
+
     date: YYYY-MM-DD (default: today).
+    all_nutrients: also fetch the day totals of those 13 nutrients that the
+    Diary Settings hide, one request per nutrient (a few seconds), for days
+    within the last 364. Set it when the user asks about nutrients beyond
+    calories and macros. Calories and macros come only from the diary, so a
+    hidden macro stays null.
     """
     day = parse_day(date)
 
     def op(store, client):
         sync.poll(store, client)
         sync.refresh_day(store, client, day)
-        return store.day_record(day.isoformat())
+        failed = (
+            sync.fill_hidden_nutrients(store, client, day, day) if all_nutrients else []
+        )
+        return with_report_warning(store.day_record(day.isoformat()), failed)
 
     return await with_session(ctx, op)
 
@@ -546,7 +578,13 @@ async def fitness_get_trends(
 ) -> dict:
     """A single metric over a date range, for charts/analysis.
 
-    metric: weight | calories_in | protein | carbs | fat.
+    metric: weight | calories_in | protein | carbs | fat, or a nutrient in the
+    units fitness_get_day gives: saturated_fat | polyunsaturated_fat |
+    monounsaturated_fat | trans_fat | cholesterol | sodium | potassium |
+    fiber | sugar | vitamin_a | vitamin_c | calcium | iron. A nutrient the
+    Diary Settings hide costs one request to MyFitnessPal's report for it,
+    which fills the days already cached (sync keeps the last 30 by default)
+    within the last 364.
     start/end: YYYY-MM-DD (default: last 30 days).
     Returns {metric, points: [{day, value}, ...]} with nulls omitted.
     """
@@ -555,10 +593,20 @@ async def fitness_get_trends(
 
     def op(store, client):
         sync.poll(store, client)
-        return {
-            "metric": metric,
-            "points": store.trend(metric, start_day.isoformat(), end_day.isoformat()),
-        }
+        failed = []
+        if metric in EXTRA_NUTRIENTS:
+            failed = sync.fill_hidden_nutrients(
+                store, client, start_day, end_day, nutrients=(metric,)
+            )
+        return with_report_warning(
+            {
+                "metric": metric,
+                "points": store.trend(
+                    metric, start_day.isoformat(), end_day.isoformat()
+                ),
+            },
+            failed,
+        )
 
     return await with_session(ctx, op)
 
@@ -568,29 +616,41 @@ async def fitness_bulk_export(
     start: str | None = None,
     end: str | None = None,
     sync_first: bool = False,
+    all_nutrients: bool = False,
     ctx: Context = None,
 ) -> dict:
     """Export a whole date range at once for analysis: per-day nutrition
     totals, food entries with macros, the MyFitnessPal daily note, and local
-    feel notes. Read-only.
+    feel notes. Read-only. Nutrition fields and units match fitness_get_day.
 
     start/end: YYYY-MM-DD (default: last 30 days ending today).
     sync_first: gap-fill from MyFitnessPal before exporting. Off by default so
     large historical exports stay fast on cached data.
+    all_nutrients: also fetch the nutrient totals the Diary Settings hide for
+    the cached days in the range, as in fitness_get_day: one request per
+    nutrient, for days within the last 364.
     """
     start_day, end_day = parse_range(start, end)
 
     def op():
         store = get_store()
-        if sync_first:
-            span = (end_day - start_day).days + 1
-            sync.poll(store, mfp_client.get_client(), days=span, force=True)
+        failed = []
+        if sync_first or all_nutrients:
+            client = mfp_client.get_client()
+            if sync_first:
+                span = (end_day - start_day).days + 1
+                sync.poll(store, client, days=span, force=True)
+            if all_nutrients:
+                failed = sync.fill_hidden_nutrients(store, client, start_day, end_day)
         days = store.export_range(start_day.isoformat(), end_day.isoformat())
-        return {
-            "start": start_day.isoformat(),
-            "end": end_day.isoformat(),
-            "count": len(days),
-            "days": days,
-        }
+        return with_report_warning(
+            {
+                "start": start_day.isoformat(),
+                "end": end_day.isoformat(),
+                "count": len(days),
+                "days": days,
+            },
+            failed,
+        )
 
     return await run_with_refresh(ctx, op)

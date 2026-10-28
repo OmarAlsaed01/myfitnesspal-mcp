@@ -164,7 +164,7 @@ Then use the same `--from 'mfp-mcp[autorefresh]'` form in your client config
 
 | Tool | What it does |
 | --- | --- |
-| `fitness_get_day` | Nutrition totals, diary entries, the MFP daily note, and feel note for a day |
+| `fitness_get_day` | Nutrition totals (calories, macros, and every other nutrient MFP tracks), diary entries, the MFP daily note, and feel note for a day |
 | `fitness_search_food` | Candidate matches with brand, calories, macros, serving, and ids |
 | `fitness_draft_food` | Numbered options with every serving size, filtered/ranked by optional calorie and macro targets |
 | `fitness_log_food` | Log a draft option (and serving), a remembered food, or exact ids to the real diary |
@@ -180,7 +180,7 @@ Then use the same `--from 'mfp-mcp[autorefresh]'` form in your client config
 | `fitness_get_note` | Read the MyFitnessPal daily diary note (the "Notes" box) for a day |
 | `fitness_log_note` | Write that daily note to MFP (replace, or `append` a new line) |
 | `fitness_log_feel` | Save a subjective "how I feel" note (stored locally, never sent to MFP) |
-| `fitness_get_trends` | One metric over a date range: weight, calories_in, protein, carbs, fat |
+| `fitness_get_trends` | One metric over a date range: weight, calories_in, protein, carbs, fat, or any other nutrient |
 | `fitness_bulk_export` | Whole date range in one call, for analysis |
 
 ### Logging flow
@@ -310,6 +310,9 @@ MCP client and model you connect it to.
   supplies the `food_id`/`weight_id` that `/food/add` accepts, deletes go
   through `/food/remove`, water reads/writes via `/food/water`, and the daily
   note reads/writes via `/food/note` — each with the page CSRF token.
+- Nutrients the Diary Settings hide come from the web app's per-nutrient
+  reports (`/api/services/reports/results/nutrition/<Nutrient>/<days>.json`),
+  fetched only when a tool asks for them.
 - Day summaries, trends, and exports read a local SQLite cache that gap-fills
   missing days. The MyFitnessPal daily note syncs both ways; feel notes are
   local-only.
