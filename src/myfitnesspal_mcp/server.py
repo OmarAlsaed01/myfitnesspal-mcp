@@ -127,6 +127,17 @@ def with_report_warning(response: dict, failed_reports: list[str]) -> dict:
     }
 
 
+async def day_after_write(ctx: Context, day: datetime.date, result: dict) -> dict:
+    """The refreshed day rides along so the model sees the new totals without
+    a follow-up fitness_get_day. After a failed refresh the cache still holds
+    the day from before the write, which would show the change undone and
+    invite a repeat, so the day is left out."""
+    refresh_warning = await refresh_after_write(ctx, day)
+    if refresh_warning:
+        return {"ok": True, **result, **refresh_warning}
+    return {"ok": True, **result, "day": get_store().day_record(day.isoformat())}
+
+
 @mcp.tool(title="Get day summary", annotations=READS_MFP)
 async def fitness_get_day(
     date: str | None = None, all_nutrients: bool = False, ctx: Context = None
@@ -266,6 +277,10 @@ async def fitness_log_food(
     meal: breakfast|lunch|dinner|snacks (default breakfast) or any meal name
     on the account. quantity: number of servings (default 1).
     date: YYYY-MM-DD (default today).
+
+    Returns the logged entry and the updated day under `day`, shaped like
+    fitness_get_day, so no follow-up fitness_get_day is needed. If refreshing
+    the day fails, `day` is left out and refresh_warning says so.
     """
     explicit_day = parse_day(date) if date else None
     day = explicit_day or parse_day(None)
@@ -306,15 +321,9 @@ async def fitness_log_food(
     result = await with_session(ctx, op)
     if not result.get("logged"):
         return {"ok": True, **result}
-    refresh_warning = await refresh_after_write(
-        ctx, datetime.date.fromisoformat(result["date"])
+    return await day_after_write(
+        ctx, datetime.date.fromisoformat(result["date"]), result
     )
-    return {
-        "ok": True,
-        **result,
-        **refresh_warning,
-        "day": get_store().day_record(result["date"]),
-    }
 
 
 @mcp.tool(title="List remembered foods", annotations=READS_LOCAL)
@@ -351,6 +360,10 @@ async def fitness_delete_food(
     to remove another.
     meal: optional breakfast|lunch|dinner|snacks or any meal name on the
     account, to disambiguate duplicates. date: YYYY-MM-DD (default: today).
+
+    Returns what was removed and the updated day under `day`, shaped like
+    fitness_get_day, so no follow-up fitness_get_day is needed. If refreshing
+    the day fails, `day` is left out and refresh_warning says so.
     """
     day = parse_day(date)
 
@@ -358,7 +371,7 @@ async def fitness_delete_food(
         return diary.delete_food(client, day, query, meal)
 
     result = await with_session(ctx, op)
-    return {"ok": True, **result, **await refresh_after_write(ctx, day)}
+    return await day_after_write(ctx, day, result)
 
 
 @mcp.tool(title="Replace food entry", annotations=CHANGES_MFP)
@@ -388,6 +401,11 @@ async def fitness_modify_food(
     meal: breakfast|lunch|dinner|snacks or any meal name on the account,
     used for both the delete and the add. quantity: servings (default 1, or
     the draft's). date: YYYY-MM-DD (default: today).
+
+    Once the entry is replaced, returns what was removed and added and the
+    updated day under `day`, shaped like fitness_get_day, so no follow-up
+    fitness_get_day is needed. If refreshing the day fails, `day` is left out
+    and refresh_warning says so.
     """
     day = parse_day(date)
 
@@ -408,7 +426,7 @@ async def fitness_modify_food(
     result = await with_session(ctx, op)
     if result.get("needs_choice"):
         return {"ok": True, **result}
-    return {"ok": True, **result, **await refresh_after_write(ctx, day)}
+    return await day_after_write(ctx, day, result)
 
 
 @mcp.tool(title="Log weight", annotations=SETS_IN_MFP)

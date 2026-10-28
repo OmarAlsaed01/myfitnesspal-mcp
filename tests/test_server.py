@@ -252,6 +252,79 @@ def test_failed_refresh_after_write_warns_instead_of_raising(connected, monkeypa
     assert len(posts_to(connected, "food/remove")) == 1
 
 
+@pytest.fixture
+def refresh_writes_day(connected, monkeypatch):
+    def refresh(store, client, day):
+        store.upsert_nutrition(day.isoformat(), calories=1800.0)
+        store.replace_diary(
+            day.isoformat(),
+            [{"meal": "Breakfast", "name": "Oatmeal", "calories": 300.0}],
+        )
+
+    monkeypatch.setattr(server.sync, "refresh_day", refresh)
+
+
+FOOD_WRITES = pytest.mark.parametrize(
+    "write",
+    [
+        lambda: server.fitness_log_food(
+            query="Banana", food_id="111", weight_id="20", date="2026-07-08"
+        ),
+        lambda: server.fitness_delete_food(query="coffee", date="2026-07-08"),
+        lambda: server.fitness_modify_food(
+            query="coffee", new_query="banana", date="2026-07-08"
+        ),
+    ],
+    ids=["log", "delete", "modify"],
+)
+
+
+@FOOD_WRITES
+def test_food_writes_return_the_refreshed_day(refresh_writes_day, write):
+    result = asyncio.run(write())
+
+    assert result["ok"] is True
+    assert result["day"]["day"] == "2026-07-08"
+    assert result["day"]["nutrition"]["calories"] == 1800.0
+    assert [entry["name"] for entry in result["day"]["diary"]] == ["Oatmeal"]
+
+
+@FOOD_WRITES
+def test_food_writes_leave_out_a_day_that_failed_to_refresh(
+    connected, local_store, monkeypatch, write
+):
+    local_store.replace_diary(
+        "2026-07-08", [{"meal": "Breakfast", "name": "Coffee", "calories": 2.0}]
+    )
+    monkeypatch.setattr(server.refresh, "refresh_session", lambda: None)
+
+    def always_expired(store, client, day):
+        raise MyfitnesspalLoginError("session expired")
+
+    monkeypatch.setattr(server.sync, "refresh_day", always_expired)
+
+    result = asyncio.run(write())
+
+    assert result["ok"] is True
+    assert "don't repeat" in result["refresh_warning"]
+    assert "day" not in result
+
+
+def test_modify_food_needing_a_choice_refreshes_nothing(connected, monkeypatch):
+    refreshed = []
+    monkeypatch.setattr(
+        server.sync, "refresh_day", lambda store, client, day: refreshed.append(day)
+    )
+
+    result = asyncio.run(
+        server.fitness_modify_food(query="coffee", new_query="bread", date="2026-07-08")
+    )
+
+    assert result["needs_choice"] is True
+    assert refreshed == []
+    assert not posts_to(connected, "food/")
+
+
 def test_pin_tools(local_store):
     local_store.set_pin("banana", "111", "10", "Banana", "1 medium")
     local_store.set_pin("oats", "333", "40", "Oats", None)
