@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
 - `auth --clipboard` waits for the session cookie on the macOS clipboard and
   connects as soon as you copy it, skipping anything that isn't a session
   token (such as the command itself) and any token that doesn't authenticate.
+- `mfp-mcp --version` prints the installed version. The bug report template
+  already asked for its output, but the flag didn't exist, so it failed with
+  "unrecognized arguments".
 
 ### Changed
 
