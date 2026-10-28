@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from myfitnesspal_mcp.nutrients import EXTRA_NUTRIENTS
+
 
 def test_reads_never_see_a_half_replaced_diary():
     from myfitnesspal_mcp.store import Store
@@ -142,6 +144,132 @@ def test_migrates_pre_diary_synced_database(tmp_path):
         "2026-07-02",
     }
     assert store.nutrition("2026-07-03")["weight"] == 80.0
+
+
+def test_migrates_database_without_extra_nutrient_columns(tmp_path):
+    from myfitnesspal_mcp.store import Store
+
+    path = tmp_path / "old.db"
+    legacy = sqlite3.connect(str(path))
+    legacy.executescript(
+        """
+        CREATE TABLE day_nutrition (
+            day TEXT PRIMARY KEY, calories REAL, protein REAL, carbs REAL,
+            fat REAL, water_ml REAL, weight REAL, goal_calories REAL,
+            diary_synced INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE diary_entry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, meal TEXT,
+            name TEXT, calories REAL, protein REAL, carbs REAL, fat REAL
+        );
+        INSERT INTO day_nutrition (day, calories) VALUES ('2026-07-01', 2000.0);
+        INSERT INTO diary_entry (day, meal, name, calories)
+            VALUES ('2026-07-01', 'Lunch', 'Soup', 200.0);
+        """
+    )
+    legacy.commit()
+    legacy.close()
+
+    store = Store(path)
+    for table in ("day_nutrition", "diary_entry"):
+        columns = {
+            row["name"] for row in store.conn.execute(f"PRAGMA table_info({table})")
+        }
+        assert set(EXTRA_NUTRIENTS) <= columns
+    nutrition = store.nutrition("2026-07-01")
+    assert nutrition["calories"] == 2000.0
+    assert not set(EXTRA_NUTRIENTS) & set(nutrition)
+    assert store.diary("2026-07-01") == [
+        {
+            "meal": "Lunch",
+            "name": "Soup",
+            "calories": 200.0,
+            "protein": None,
+            "carbs": None,
+            "fat": None,
+        }
+    ]
+
+    store.upsert_nutrition("2026-07-02", sodium=1800.0, potassium=3100.0)
+    store.replace_diary("2026-07-02", [{"meal": "Lunch", "name": "Soup", "sugar": 4}])
+    assert store.nutrition("2026-07-02")["potassium"] == 3100.0
+    assert store.diary("2026-07-02")[0]["sugar"] == 4.0
+
+
+def test_diary_lists_only_the_nutrients_the_diary_showed(store):
+    store.replace_diary(
+        "2026-07-01",
+        [{"meal": "Lunch", "name": "Soup", "calories": 200, "sodium": 0, "iron": 4}],
+    )
+    [entry] = store.diary("2026-07-01")
+    assert entry["sodium"] == 0.0
+    assert entry["iron"] == 4.0
+    assert "potassium" not in entry
+    assert entry["fat"] is None
+
+
+def test_days_missing_nutrient_needs_a_synced_day_with_food_logged(store):
+    store.upsert_nutrition("2026-07-01", calories=2000.0)
+    store.upsert_nutrition("2026-07-02", calories=1800.0, potassium=3000.0)
+    store.upsert_nutrition("2026-07-03", calories=None)
+    store.upsert_nutrition("2026-07-04", calories=1900.0)
+    store.upsert_nutrition("2026-07-09", calories=2100.0)
+    for day in ("2026-07-01", "2026-07-02", "2026-07-03", "2026-07-09"):
+        store.mark_diary_synced(day)
+
+    assert store.days_missing_nutrient("potassium", "2026-07-01", "2026-07-08") == {
+        "2026-07-01"
+    }
+
+
+def test_nutrition_leaves_out_unknown_extras_but_keeps_the_rest(store):
+    store.upsert_nutrition("2026-07-01", calories=2000.0, sodium=0.0)
+    nutrition = store.nutrition("2026-07-01")
+    assert nutrition["sodium"] == 0.0
+    assert "potassium" not in nutrition
+    assert nutrition["fat"] is None
+    assert nutrition["water_ml"] is None
+
+
+def test_fill_nutrient_keeps_known_totals_and_adds_no_rows(store):
+    store.upsert_nutrition("2026-07-01", calories=2000.0, sodium=2300.0)
+    store.upsert_nutrition("2026-07-02", calories=1800.0)
+    for day in ("2026-07-01", "2026-07-02"):
+        store.mark_diary_synced(day)
+
+    store.fill_nutrient(
+        "sodium", {"2026-07-01": 2299.0, "2026-07-02": 1500.0, "2026-07-03": 900.0}
+    )
+
+    assert store.nutrition("2026-07-01")["sodium"] == 2300.0
+    assert store.nutrition("2026-07-02")["sodium"] == 1500.0
+    assert store.nutrition("2026-07-03") is None
+
+
+def test_fill_nutrient_skips_days_without_food_logged(store):
+    store.upsert_nutrition("2026-07-01", calories=None)
+    store.mark_diary_synced("2026-07-01")
+    store.upsert_nutrition("2026-07-02", weight=180.0)
+
+    store.fill_nutrient("sodium", {"2026-07-01": 0.0, "2026-07-02": 0.0})
+
+    assert "sodium" not in store.nutrition("2026-07-01")
+    assert "sodium" not in store.nutrition("2026-07-02")
+
+
+def test_nutrient_queries_reject_unknown_names(store):
+    with pytest.raises(ValueError, match="unknown nutrient"):
+        store.days_missing_nutrient("carbs", "2026-07-01", "2026-07-02")
+    with pytest.raises(ValueError, match="unknown nutrient"):
+        store.fill_nutrient("sodium = 0; --", {})
+
+
+def test_trend_reads_any_extra_nutrient(store):
+    store.upsert_nutrition("2026-07-01", potassium=3100.0)
+    store.upsert_nutrition("2026-07-02", calories=1800.0)
+    assert store.trend("potassium", "2026-07-01", "2026-07-02") == [
+        {"day": "2026-07-01", "value": 3100.0}
+    ]
 
 
 def test_export_range_unions_sources(store):

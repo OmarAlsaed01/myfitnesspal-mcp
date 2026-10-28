@@ -14,6 +14,21 @@ All notable changes to this project are documented here. The format follows
 - `auth --clipboard` waits for the session cookie on the macOS clipboard and
   connects as soon as you copy it, skipping anything that isn't a session
   token (such as the command itself) and any token that doesn't authenticate.
+- Every nutrient MyFitnessPal tracks, beyond calories and macros: saturated,
+  polyunsaturated, monounsaturated, and trans fat, cholesterol, sodium,
+  potassium, fiber, sugar, vitamins A and C, calcium, and iron.
+  - `fitness_get_day` returns the ones MFP's Diary Settings show, in the
+    day's totals and on each diary entry. Its new `all_nutrients` parameter
+    also reads the hidden ones from MFP's nutrient reports, one request per
+    nutrient.
+  - `fitness_get_trends` accepts each one as a metric, fetching that one
+    report when cached days lack it.
+  - `fitness_bulk_export` includes them, and its new `all_nutrients`
+    parameter fills the hidden ones for the cached days in the range.
+  - A report that fails leaves its nutrient out and adds a `report_warning`.
+
+  Sodium, cholesterol, and potassium are mg; vitamins A and C, calcium, and
+  iron are % daily value; the rest are g. Reports reach back 364 days.
 
 ### Changed
 
@@ -24,6 +39,11 @@ All notable changes to this project are documented here. The format follows
   also see 1 for a session that is about to lapse.
 - `cookies.json` now also holds MyFitnessPal's long-lived remember-me cookies
   next to the session token. The file's format is unchanged.
+- The local cache gains a column per nutrient on day totals and diary
+  entries, added in place on first start. An older release can still open
+  the database. Days cached before the upgrade have none of the new
+  nutrients until a tool fetches them with `all_nutrients` or a nutrient
+  trend, or a sync refreshes the day.
 
 ### Fixed
 

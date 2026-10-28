@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 
 import pytest
 from myfitnesspal.exceptions import MyfitnesspalLoginError
@@ -317,3 +318,83 @@ def test_tools_that_remove_or_overwrite_are_marked_destructive():
         assert tools[name].annotations.destructiveHint, name
     assert not tools["fitness_log_food"].annotations.destructiveHint
     assert not tools["fitness_log_food"].annotations.idempotentHint
+
+
+@pytest.fixture
+def failed_reports():
+    return []
+
+
+@pytest.fixture
+def fill_calls(connected, monkeypatch, failed_reports):
+    calls = []
+
+    def fill(store, client, start, end, **kwargs):
+        calls.append((start, end, kwargs))
+        return failed_reports
+
+    monkeypatch.setattr(server.sync, "poll", lambda store, client, **kwargs: None)
+    monkeypatch.setattr(server.sync, "fill_hidden_nutrients", fill)
+    return calls
+
+
+def test_get_day_fetches_hidden_nutrients_only_when_asked(fill_calls):
+    asyncio.run(server.fitness_get_day(date="2026-07-08"))
+    assert fill_calls == []
+
+    asyncio.run(server.fitness_get_day(date="2026-07-08", all_nutrients=True))
+    day = datetime.date(2026, 7, 8)
+    assert fill_calls == [(day, day, {})]
+
+
+def test_trends_fetches_only_the_requested_nutrient(fill_calls):
+    asyncio.run(
+        server.fitness_get_trends(
+            metric="protein", start="2026-07-01", end="2026-07-08"
+        )
+    )
+    assert fill_calls == []
+
+    result = asyncio.run(
+        server.fitness_get_trends(
+            metric="potassium", start="2026-07-01", end="2026-07-08"
+        )
+    )
+    assert result["metric"] == "potassium"
+    assert fill_calls == [
+        (
+            datetime.date(2026, 7, 1),
+            datetime.date(2026, 7, 8),
+            {"nutrients": ("potassium",)},
+        )
+    ]
+
+
+def test_bulk_export_fills_hidden_nutrients_only_when_asked(fill_calls):
+    asyncio.run(
+        server.fitness_bulk_export(
+            start="2026-07-01", end="2026-07-08", sync_first=True
+        )
+    )
+    assert fill_calls == []
+
+    asyncio.run(
+        server.fitness_bulk_export(
+            start="2026-07-01", end="2026-07-08", all_nutrients=True
+        )
+    )
+    assert fill_calls == [(datetime.date(2026, 7, 1), datetime.date(2026, 7, 8), {})]
+
+
+@pytest.mark.parametrize("failed_reports", [["potassium", "iron"]])
+def test_a_failed_report_comes_back_as_a_warning(fill_calls, failed_reports):
+    result = asyncio.run(server.fitness_get_day(date="2026-07-08", all_nutrients=True))
+    assert "potassium, iron" in result["report_warning"]
+
+    trend = asyncio.run(server.fitness_get_trends(metric="iron"))
+    assert "report_warning" in trend
+
+
+def test_no_warning_when_every_report_came_back(fill_calls):
+    result = asyncio.run(server.fitness_get_day(date="2026-07-08", all_nutrients=True))
+    assert "report_warning" not in result
