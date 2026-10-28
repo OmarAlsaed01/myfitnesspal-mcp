@@ -319,6 +319,7 @@ def modify_food(
     draft_id: str | None = None,
     option: int | None = None,
     serving: int | None = None,
+    pin: bool = True,
 ) -> dict:
     if draft_id is not None:
         if option is None:
@@ -334,6 +335,7 @@ def modify_food(
             quantity=quantity,
             meal=meal,
             day=day,
+            pin=pin,
             page=page,
         )
         return {"removed": removed["removed"], **added}

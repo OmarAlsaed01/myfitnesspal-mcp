@@ -237,3 +237,24 @@ def test_modify_ambiguous_replacement_deletes_nothing(banana_details, store):
     assert confirmed["source"] == "draft"
     assert len(_posts_to(banana_details, "food/remove")) == 1
     assert len(_posts_to(banana_details, "food/add")) == 1
+    assert store.pin("bread") is not None
+
+
+def test_modify_from_a_draft_can_leave_pins_alone(banana_details, store):
+    draft = food_logging.modify_food(
+        banana_details, store, TODAY, "breakfast", query="coffee", new_query="bread"
+    )
+
+    confirmed = food_logging.modify_food(
+        banana_details,
+        store,
+        TODAY,
+        "breakfast",
+        query="coffee",
+        draft_id=draft["draft_id"],
+        option=1,
+        pin=False,
+    )
+
+    assert confirmed["pinned"] is False
+    assert store.pin("bread") is None

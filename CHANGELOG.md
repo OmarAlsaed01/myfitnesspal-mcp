@@ -32,6 +32,10 @@ All notable changes to this project are documented here. The format follows
 - `mfp-mcp --version` prints the installed version. The bug report template
   already asked for its output, but the flag didn't exist, so it failed with
   "unrecognized arguments".
+- `fitness_modify_food` takes `pin`, as `fitness_log_food` does. A
+  replacement picked from a draft has always been remembered for that query.
+  The tool description now says so, and `pin=False` replaces the entry
+  without touching your remembered foods.
 
 ### Changed
 
