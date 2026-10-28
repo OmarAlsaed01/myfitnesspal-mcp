@@ -64,6 +64,19 @@ All notable changes to this project are documented here. The format follows
 - `cookies.json` is replaced atomically, so a process loading it while
   another saves never reads half a file.
 
+### Fixed
+
+- Sync picks up weigh-ins logged outside mfp-mcp again, such as in the MFP
+  app or on the website. The `myfitnesspal` library reads weights from MFP's
+  `/measurements/edit` page, which needs the browser (NextAuth) part of the
+  session. That part stops working within a day or two of `mfp-mcp auth`
+  while everything else keeps working, so from then on the page redirected
+  to `/account/logout`, every sync logged `weight measurements failed:
+  'dehydratedState'`, and only weights logged with `fitness_log_weight`
+  reached the cache, `fitness_get_trends`, and exports. Sync now reads
+  weights from MFP's v2 measurements API, the same API `fitness_log_weight`
+  writes to.
+
 ## [0.4.3] - 2026-10-22
 
 ### Added

@@ -23,6 +23,21 @@ def test_site_url_joins_params_and_day_into_one_query(client):
     assert url == "https://www.myfitnesspal.com/food/search?page=1&date=2026-10-17"
 
 
+def test_api_url_without_query(client):
+    assert mfp_web.api_url(client, "v2/measurements") == (
+        "https://api.myfitnesspal.com/v2/measurements"
+    )
+
+
+def test_api_url_with_params(client):
+    url = mfp_web.api_url(
+        client, "v2/measurements", params={"from": "2026-10-01", "offset": 0}
+    )
+    assert (
+        url == "https://api.myfitnesspal.com/v2/measurements?from=2026-10-01&offset=0"
+    )
+
+
 def test_search_url_matches_the_hand_built_encoding(client):
     query = "egg & cheese 1/2 cup"
     food_search.search_results(client, query)

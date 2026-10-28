@@ -3,7 +3,7 @@ import threading
 from contextlib import contextmanager
 from datetime import date, timedelta
 
-from . import config, notes, nutrient_reports
+from . import config, measurements, notes, nutrient_reports
 from .mfp_client import is_auth_error
 from .nutrients import EXTRA_NUTRIENTS, diary_column_nutrient
 from .store import Store
@@ -171,7 +171,7 @@ def _poll_window(store: Store, client, days: int | None, today: date) -> None:
             refresh_day(store, client, day)
 
     with tolerating_failures("weight measurements"):
-        weights = client.get_measurements("Weight", window_start)
+        weights = measurements.get_weights(client, window_start, today)
         for day, value in weights.items():
             if day >= window_start:
                 store.upsert_nutrition(day.isoformat(), weight=float(value))

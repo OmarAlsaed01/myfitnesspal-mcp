@@ -1,5 +1,6 @@
 import datetime
 import threading
+from urllib import parse
 
 import pytest
 from myfitnesspal.exceptions import MyfitnesspalLoginError
@@ -56,43 +57,56 @@ class FakeDay:
         ]
 
 
-class FakeNoteResponse:
-    def __init__(self, body):
-        self._body = body
+class FakeJsonResponse:
+    def __init__(self, data):
+        self._data = data
 
     def json(self):
-        return {"item": {"body": self._body}}
+        return self._data
 
     def raise_for_status(self):
         pass
 
 
-class FakeNoteSession:
-    def __init__(self, body):
-        self.body = body
+class FakeSyncSession:
+    def __init__(self, client):
+        self.client = client
+        self.measurement_queries = []
 
     def get(self, url, **kwargs):
-        return FakeNoteResponse(self.body)
+        if "v2/measurements" in url:
+            query = dict(parse.parse_qsl(parse.urlsplit(url).query))
+            self.measurement_queries.append(query)
+            return FakeJsonResponse(self._weights_page(query))
+        return FakeJsonResponse({"item": {"body": self.client.note_body}})
+
+    def _weights_page(self, query):
+        start = datetime.date.fromisoformat(query["from"])
+        end = datetime.date.fromisoformat(query["to"])
+        items = [
+            {"type": "Weight", "value": value, "date": day.isoformat()}
+            for day, value in sorted(self.client.weights.items(), reverse=True)
+            if start <= day <= end
+        ]
+        return {"items": items, "has_more": False, "total_entries": len(items)}
 
 
 class FakeSyncClient:
     BASE_URL_SECURE = "https://www.myfitnesspal.com/"
+    BASE_API_URL = "https://api.myfitnesspal.com/"
 
     def __init__(self, note_body="today felt great"):
         self.fetched = []
         self.weights = {}
+        self.note_body = note_body
         self.access_token = "fake-token"
         self.user_id = "user-1"
         self.effective_username = "tester"
-        self.session = FakeNoteSession(note_body)
+        self.session = FakeSyncSession(self)
 
     def get_date(self, day):
         self.fetched.append(day)
         return FakeDay()
-
-    def get_measurements(self, kind, earliest):
-        self.measurements_earliest = earliest
-        return {day: value for day, value in self.weights.items() if day >= earliest}
 
 
 def test_refresh_day_populates_store(store):
@@ -375,7 +389,7 @@ def test_poll_backfills_weight_for_already_cached_day(store):
     sync.poll(store, client, days=3, force=True, today=TODAY)
 
     assert client.fetched == [TODAY]
-    assert client.measurements_earliest == window_start
+    assert client.session.measurement_queries[-1]["from"] == window_start.isoformat()
     assert store.nutrition(yesterday.isoformat())["weight"] == 79.5
 
 

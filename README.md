@@ -303,9 +303,11 @@ MCP client and model you connect it to.
 ## How it works
 
 - [python-myfitnesspal](https://github.com/coddingtonbear/python-myfitnesspal)
-  parses the diary, measurements, and exercise pages — run over a `curl_cffi`
+  parses the diary and exercise pages — run over a `curl_cffi`
   session that impersonates Chrome's TLS fingerprint so Cloudflare lets it
   through with just the NextAuth session cookie.
+- Weigh-ins are read and logged through the web app's own
+  `api.myfitnesspal.com/v2/measurements` API.
 - Writes replicate the web app's own XHR calls: the legacy food-search page
   supplies the `food_id`/`weight_id` that `/food/add` accepts, deletes go
   through `/food/remove`, water reads/writes via `/food/water`, and the daily
