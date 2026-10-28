@@ -29,6 +29,9 @@ All notable changes to this project are documented here. The format follows
 
   Sodium, cholesterol, and potassium are mg; vitamins A and C, calcium, and
   iron are % daily value; the rest are g. Reports reach back 364 days.
+- `mfp-mcp --version` prints the installed version. The bug report template
+  already asked for its output, but the flag didn't exist, so it failed with
+  "unrecognized arguments".
 
 ### Changed
 

@@ -2,6 +2,8 @@ import argparse
 import logging
 import sys
 
+from . import __version__
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -37,6 +39,7 @@ def main() -> None:
     parser.add_argument(
         "--port", type=int, default=8484, help="HTTP port (default 8484)"
     )
+    parser.add_argument("--version", action="version", version=f"mfp-mcp {__version__}")
     args = parser.parse_args()
 
     if args.check and args.command != "auth":
