@@ -51,6 +51,21 @@ All notable changes to this project are documented here. The format follows
   the database. Days cached before the upgrade have none of the new
   nutrients until a tool fetches them with `all_nutrients` or a nutrient
   trend, or a sync refreshes the day.
+- `fitness_delete_food` and `fitness_modify_food` now also return the updated
+  day under `day`, shaped like `fitness_get_day`, as `fitness_log_food`
+  already did, so a model doesn't need a follow-up `fitness_get_day` to see
+  the new totals. As with `fitness_log_food`, a modify that needs a choice
+  still returns the draft, whose `day` is its date string. All three tool
+  descriptions now say the day comes back.
+- When refreshing the day after a food write fails, `fitness_log_food`,
+  `fitness_delete_food`, and `fitness_modify_food` leave `day` out and return
+  only `refresh_warning`. `fitness_log_food` used to return the cached day
+  from before the write, which showed the change as if it hadn't happened.
+- The `quantity` descriptions on `fitness_draft_food`, `fitness_log_food`,
+  and `fitness_modify_food` now say it multiplies the chosen serving and isn't
+  grams by itself: to log 228 g, pick a gram serving and divide (2.28 with
+  "100 g", 228 with "1 g"). Before, a model could log 228 servings when the user meant
+  228 g.
 
 ### Fixed
 
@@ -70,9 +85,6 @@ All notable changes to this project are documented here. The format follows
   Enter was dropped. The prompt now reads with canonical mode off.
 - `cookies.json` is replaced atomically, so a process loading it while
   another saves never reads half a file.
-
-### Fixed
-
 - Sync picks up weigh-ins logged outside mfp-mcp again, such as in the MFP
   app or on the website. The `myfitnesspal` library reads weights from MFP's
   `/measurements/edit` page, which needs the browser (NextAuth) part of the
@@ -83,23 +95,6 @@ All notable changes to this project are documented here. The format follows
   reached the cache, `fitness_get_trends`, and exports. Sync now reads
   weights from MFP's v2 measurements API, the same API `fitness_log_weight`
   writes to.
-### Changed
-
-- `fitness_delete_food` and `fitness_modify_food` now also return the updated
-  day under `day`, shaped like `fitness_get_day`, as `fitness_log_food`
-  already did, so a model doesn't need a follow-up `fitness_get_day` to see
-  the new totals. As with `fitness_log_food`, a modify that needs a choice
-  still returns the draft, whose `day` is its date string. All three tool
-  descriptions now say the day comes back.
-- When refreshing the day after a food write fails, `fitness_log_food`,
-  `fitness_delete_food`, and `fitness_modify_food` leave `day` out and return
-  only `refresh_warning`. `fitness_log_food` used to return the cached day
-  from before the write, which showed the change as if it hadn't happened.
-- The `quantity` descriptions on `fitness_draft_food`, `fitness_log_food`,
-  and `fitness_modify_food` now say it multiplies the chosen serving and isn't
-  grams by itself: to log 228 g, pick a gram serving and divide (2.28 with
-  "100 g", 228 with "1 g"). Before, a model could log 228 servings when the user meant
-  228 g.
 
 ## [0.4.3] - 2026-10-22
 
