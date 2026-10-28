@@ -176,7 +176,8 @@ async def fitness_draft_food(
 
     Log a choice with fitness_log_food(draft_id=..., option=N, serving=M);
     call this again with different targets to refine. Drafts last 24 hours.
-    date: YYYY-MM-DD (default: today).
+    quantity: multiplies the serving you log, so log the serving that matches
+    the amount (see fitness_log_food). date: YYYY-MM-DD (default: today).
     """
     day = parse_day(date)
     targets = MacroTargets(
@@ -232,8 +233,9 @@ async def fitness_log_food(
     exactly that item, `query` being its display name.
 
     meal: breakfast|lunch|dinner|snacks (default breakfast) or any meal name
-    on the account. quantity: number of servings (default 1).
-    date: YYYY-MM-DD (default today).
+    on the account. quantity: multiplies the chosen serving (default 1) and
+    isn't grams by itself: to log 228 g, pick a gram serving and divide:
+    quantity=2.28 with "100 g", or 228 with "1 g". date: YYYY-MM-DD (default today).
     """
     explicit_day = parse_day(date) if date else None
     day = explicit_day or parse_day(None)
@@ -354,8 +356,9 @@ async def fitness_modify_food(
     changed and a draft comes back (needs_choice=true) — call again with the
     same query plus draft_id + option (and optionally serving).
     meal: breakfast|lunch|dinner|snacks or any meal name on the account,
-    used for both the delete and the add. quantity: servings (default 1, or
-    the draft's). date: YYYY-MM-DD (default: today).
+    used for both the delete and the add. quantity: multiplies the chosen
+    serving (default 1, or the draft's), as in fitness_log_food.
+    date: YYYY-MM-DD (default: today).
     """
     day = parse_day(date)
 

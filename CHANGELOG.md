@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows
   also see 1 for a session that is about to lapse.
 - `cookies.json` now also holds MyFitnessPal's long-lived remember-me cookies
   next to the session token. The file's format is unchanged.
+- The `quantity` descriptions on `fitness_draft_food`, `fitness_log_food`,
+  and `fitness_modify_food` now say it multiplies the chosen serving and isn't
+  grams by itself: to log 228 g, pick a gram serving and divide (2.28 with
+  "100 g", 228 with "1 g"). Before, a model could log 228 servings when the user meant
+  228 g.
 
 ### Fixed
 
