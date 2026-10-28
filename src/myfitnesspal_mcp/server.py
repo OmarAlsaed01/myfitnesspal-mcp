@@ -339,6 +339,7 @@ async def fitness_modify_food(
     draft_id: str | None = None,
     option: int | None = None,
     serving: int | None = None,
+    pin: bool = True,
     ctx: Context = None,
 ) -> dict:
     """Replace a MyFitnessPal diary entry: deletes the match, then adds a food.
@@ -352,7 +353,9 @@ async def fitness_modify_food(
     quantity). The replacement is chosen like fitness_log_food's: a pinned
     food or a single exact-name match is used directly; otherwise nothing is
     changed and a draft comes back (needs_choice=true) — call again with the
-    same query plus draft_id + option (and optionally serving).
+    same query plus draft_id + option (and optionally serving). Like
+    fitness_log_food, a draft choice is remembered for that query unless
+    pin=False.
     meal: breakfast|lunch|dinner|snacks or any meal name on the account,
     used for both the delete and the add. quantity: servings (default 1, or
     the draft's). date: YYYY-MM-DD (default: today).
@@ -371,6 +374,7 @@ async def fitness_modify_food(
             draft_id=draft_id,
             option=option,
             serving=serving,
+            pin=pin,
         )
 
     result = await with_session(ctx, op)
