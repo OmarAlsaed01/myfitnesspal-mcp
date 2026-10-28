@@ -91,6 +91,11 @@ All notable changes to this project are documented here. The format follows
   `fitness_delete_food`, and `fitness_modify_food` leave `day` out and return
   only `refresh_warning`. `fitness_log_food` used to return the cached day
   from before the write, which showed the change as if it hadn't happened.
+- The `quantity` descriptions on `fitness_draft_food`, `fitness_log_food`,
+  and `fitness_modify_food` now say it multiplies the chosen serving and isn't
+  grams by itself: to log 228 g, pick a gram serving and divide (2.28 with
+  "100 g", 228 with "1 g"). Before, a model could log 228 servings when the user meant
+  228 g.
 
 ## [0.4.3] - 2026-10-22
 
