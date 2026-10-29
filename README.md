@@ -165,8 +165,8 @@ Then use the same `--from 'mfp-mcp[autorefresh]'` form in your client config
 | Tool | What it does |
 | --- | --- |
 | `fitness_get_day` | Nutrition totals (calories, macros, and every other nutrient MFP tracks), goals and remaining macros, diary entries, the MFP daily note, and feel note for a day |
-| `fitness_search_food` | Candidate matches with brand, calories, macros, serving, and ids |
-| `fitness_draft_food` | Numbered options with every serving size, filtered/ranked by optional calorie and macro targets |
+| `fitness_search_food` | Candidate matches with brand, calories, macros, sodium/potassium/fiber/sugar where listed, serving, and ids |
+| `fitness_draft_food` | Numbered options with every serving size and its sodium/potassium/fiber/sugar where listed, filtered/ranked by optional calorie and macro targets (`prefer_micros` ranks foods listing all four first) |
 | `fitness_log_food` | Log a draft option (and serving), a remembered food, or exact ids to the real diary |
 | `fitness_list_food_pins` | Remembered query → food/serving choices (local) |
 | `fitness_clear_food_pin` | Forget one remembered choice, or all of them |

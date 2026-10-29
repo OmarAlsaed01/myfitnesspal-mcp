@@ -1,6 +1,7 @@
 import logging
 
 from .mfp_web import get_document, site_url
+from .nutrients import DRAFT_MICROS
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,11 @@ def food_details(client, external_id: str | None) -> dict | None:
     try:
         details = client._get_food_item_details(int(external_id))
         nutrition = details["nutrition"]
+        reported_micros = {
+            nutrient: nutrition[nutrient]
+            for nutrient in DRAFT_MICROS
+            if nutrition.get(nutrient) is not None
+        }
         return {
             "verified": details.get("verified"),
             "nutrition": {
@@ -102,6 +108,7 @@ def food_details(client, external_id: str | None) -> dict | None:
                 "protein": nutrition.get("protein"),
                 "carbs": nutrition.get("carbohydrates"),
                 "fat": nutrition.get("fat"),
+                **reported_micros,
             },
             "serving_sizes": details.get("serving_sizes") or [],
         }

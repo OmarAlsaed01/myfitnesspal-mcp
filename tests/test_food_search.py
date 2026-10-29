@@ -118,3 +118,31 @@ def test_food_candidates_build_ranking_shape(client):
     ]
     assert banana_bread["default_weight_id"] == "30"
     assert banana_bread["nutrition"] == {"calories": 196.0}
+
+
+def test_food_details_keeps_the_draft_micros_the_food_lists(client):
+    client.food_details[999] = {
+        "calories": 160.0,
+        "verified": True,
+        "nutrition": {
+            "protein": 30.0,
+            "carbohydrates": 5.0,
+            "fat": 3.0,
+            "sodium": 230.0,
+            "potassium": None,
+            "fiber": 0.5,
+            "sugar": 1.0,
+            "iron": 25.0,
+            "added_sugars": 0.0,
+        },
+        "serving_sizes": [],
+    }
+    assert food_search.food_details(client, "999")["nutrition"] == {
+        "calories": 160.0,
+        "protein": 30.0,
+        "carbs": 5.0,
+        "fat": 3.0,
+        "sodium": 230.0,
+        "fiber": 0.5,
+        "sugar": 1.0,
+    }

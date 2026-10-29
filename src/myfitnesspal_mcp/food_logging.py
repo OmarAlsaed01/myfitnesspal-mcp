@@ -51,6 +51,7 @@ def _option_view(option: dict) -> dict:
         "verified": option["verified"],
         "pinned": option["pinned"],
         "fits_targets": option["fits_targets"],
+        "micros_complete": option.get("micros_complete", False),
         "suggested_serving": option["serving_index"],
         "servings": [
             {
@@ -87,6 +88,7 @@ def _build_draft(
     targets: MacroTargets,
     limit: int,
     search_results: list[dict] | None = None,
+    prefer_micros: bool = False,
 ) -> tuple[str, dict]:
     targets.validate()
     pin = store.pin(query)
@@ -102,6 +104,7 @@ def _build_draft(
         targets,
         pinned_food_id=pin["food_id"] if pin else None,
         pinned_weight_id=pin["weight_id"] if pin else None,
+        prefer_micros=prefer_micros,
     )
     body = {
         "query": query,
@@ -128,6 +131,7 @@ def draft_food(
     quantity: float = 1.0,
     targets: MacroTargets | None = None,
     limit: int = 10,
+    prefer_micros: bool = False,
 ) -> dict:
     draft_id, body = _build_draft(
         client,
@@ -138,6 +142,7 @@ def draft_food(
         quantity=quantity,
         targets=targets or MacroTargets(),
         limit=limit,
+        prefer_micros=prefer_micros,
     )
     return _draft_view(draft_id, body)
 

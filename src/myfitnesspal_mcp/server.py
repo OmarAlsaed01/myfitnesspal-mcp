@@ -184,6 +184,8 @@ async def fitness_search_food(
 
     Each candidate has name, brand, calories, macros, serving, and the
     food_id + weight_id to pass to fitness_log_food to log exactly that item.
+    With macros, it also has sodium and potassium (mg) and fiber and sugar (g)
+    where the food lists them.
     """
 
     def op(store, client):
@@ -210,12 +212,15 @@ async def fitness_draft_food(
     min_fat: float | None = None,
     max_fat: float | None = None,
     limit: int = 10,
+    prefer_micros: bool = False,
     ctx: Context = None,
 ) -> dict:
     """Draft a food entry: numbered options to choose from before logging.
 
     Each option lists every serving size with its calories/protein/carbs/fat
-    for the whole entry (serving × quantity) and a suggested_serving. The
+    for the whole entry (serving × quantity) and a suggested_serving. Servings
+    also carry sodium and potassium (mg) and fiber and sugar (g) where the food
+    lists them; micros_complete says whether it lists all four. The
     min_/max_ targets (grams; calories in kcal) also apply to the whole
     entry: options that fit come first, near misses follow, flagged
     fits_targets=false. A food you've confirmed before for this query is
@@ -225,6 +230,9 @@ async def fitness_draft_food(
     call this again with different targets to refine. Drafts last 24 hours.
     quantity: multiplies the serving you log, so log the serving that matches
     the amount (see fitness_log_food). date: YYYY-MM-DD (default: today).
+    prefer_micros: among options that fit the targets equally well, put
+    those with micros_complete first. Set it when the user tracks sodium,
+    potassium, fiber, or sugar.
     """
     day = parse_day(date)
     targets = MacroTargets(
@@ -248,6 +256,7 @@ async def fitness_draft_food(
             quantity=quantity,
             targets=targets,
             limit=limit,
+            prefer_micros=prefer_micros,
         )
 
     return await with_session(ctx, op)

@@ -471,3 +471,15 @@ def test_a_failed_report_comes_back_as_a_warning(fill_calls, failed_reports):
 def test_no_warning_when_every_report_came_back(fill_calls):
     result = asyncio.run(server.fitness_get_day(date="2026-07-08", all_nutrients=True))
     assert "report_warning" not in result
+
+
+def test_draft_food_passes_prefer_micros(connected, monkeypatch):
+    seen = {}
+
+    def fake_draft(client, store, query, day, **kwargs):
+        seen.update(kwargs)
+        return {"draft_id": "d", "options": []}
+
+    monkeypatch.setattr(server.food_logging, "draft_food", fake_draft)
+    asyncio.run(server.fitness_draft_food(query="shake", prefer_micros=True))
+    assert seen["prefer_micros"] is True

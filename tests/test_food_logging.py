@@ -258,3 +258,30 @@ def test_modify_from_a_draft_can_leave_pins_alone(banana_details, store):
 
     assert confirmed["pinned"] is False
     assert store.pin("bread") is None
+
+
+def test_draft_servings_carry_scaled_micros(banana_details, store):
+    banana_details.food_details[999]["nutrition"].update(
+        {"sodium": 1.0, "potassium": 422.0, "fiber": 3.1, "sugar": 14.4}
+    )
+    draft = food_logging.draft_food(banana_details, store, "banana", TODAY, quantity=2)
+    banana = next(o for o in draft["options"] if o["name"] == "Banana")
+    bread = next(o for o in draft["options"] if o["name"] == "Banana Bread")
+    medium = banana["servings"][0]
+    assert banana["micros_complete"] is True
+    assert (medium["sodium"], medium["potassium"]) == (2.0, 844.0)
+    assert (medium["fiber"], medium["sugar"]) == (6.2, 28.8)
+    assert bread["micros_complete"] is False
+    assert "sodium" not in bread["servings"][0]
+
+
+def test_draft_prefer_micros_moves_the_complete_food_first(banana_details, store):
+    banana_details.food_details[999]["nutrition"].update(
+        {"sodium": 1.0, "potassium": 422.0, "fiber": 3.1, "sugar": 14.4}
+    )
+    plain = food_logging.draft_food(banana_details, store, "banana bread", TODAY)
+    preferred = food_logging.draft_food(
+        banana_details, store, "banana bread", TODAY, prefer_micros=True
+    )
+    assert plain["options"][0]["name"] == "Banana Bread"
+    assert preferred["options"][0]["name"] == "Banana"

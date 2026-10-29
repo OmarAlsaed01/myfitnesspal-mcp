@@ -20,6 +20,11 @@ EXTRA_NUTRIENTS = (
     "iron",
 )
 
+# Drafts carry only these four of the extras: carrying all 13 made drafts 2-3x
+# bigger, and these are the ones food entries fill in most often (checked on
+# 2026-10-29 against search results for a protein shake and a fast-food entree).
+DRAFT_MICROS = ("sodium", "potassium", "fiber", "sugar")
+
 # Diary page column headers are MFP abbreviations, lowercased by
 # python-myfitnesspal. Only "Sodium", "Sugar", "Fiber" and the library's own
 # "Potass." have been seen live, so the others match by prefix ("Sat Fat" and

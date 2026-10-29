@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from .nutrients import DRAFT_MICROS
+
 NUTRIENTS = ("calories", "protein", "carbs", "fat")
 
 
@@ -36,14 +38,19 @@ def normalize_query(query: str) -> str:
 def entry_nutrition(
     base: dict, nutrition_multiplier: float | None, quantity: float
 ) -> dict[str, float | None]:
+    scaled = dict.fromkeys(NUTRIENTS)
     if nutrition_multiplier is None:
-        return dict.fromkeys(NUTRIENTS)
+        return scaled
     factor = nutrition_multiplier * quantity
-    scaled = {}
-    for nutrient in NUTRIENTS:
+    for nutrient in (*NUTRIENTS, *DRAFT_MICROS):
         value = base.get(nutrient)
-        scaled[nutrient] = None if value is None else round(value * factor, 1)
+        if value is not None:
+            scaled[nutrient] = round(value * factor, 1)
     return scaled
+
+
+def micros_complete(base: dict) -> bool:
+    return all(base.get(nutrient) is not None for nutrient in DRAFT_MICROS)
 
 
 def target_shortfall(nutrition: dict, targets: MacroTargets) -> float:
@@ -99,6 +106,7 @@ def rank_candidates(
     *,
     pinned_food_id: str | None = None,
     pinned_weight_id: str | None = None,
+    prefer_micros: bool = False,
 ) -> list[dict]:
     targets = targets or MacroTargets()
     wanted_name = normalize_query(query)
@@ -130,6 +138,7 @@ def rank_candidates(
                 "exact_match": normalize_query(candidate["name"]) == wanted_name,
                 "fits_targets": shortfall == 0.0,
                 "shortfall": shortfall,
+                "micros_complete": micros_complete(candidate.get("nutrition") or {}),
                 "search_rank": candidate.get("search_rank"),
                 "default_weight_id": candidate.get("default_weight_id"),
                 "serving_index": best_index,
@@ -141,6 +150,7 @@ def rank_candidates(
             not option["pinned"],
             not option["fits_targets"],
             option["shortfall"],
+            prefer_micros and not option["micros_complete"],
             not option["exact_match"],
             not option["verified"],
             option["search_rank"] is None,

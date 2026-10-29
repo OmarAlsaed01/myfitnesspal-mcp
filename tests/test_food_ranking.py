@@ -147,3 +147,52 @@ def test_pinned_food_uses_pinned_serving():
         candidates, "salmon", pinned_food_id="1", pinned_weight_id="large"
     )[0]
     assert option["serving_index"] == 1
+
+
+def test_entry_nutrition_scales_the_micros_a_food_lists():
+    base = {"calories": 100, "protein": 10, "carbs": 20, "fat": 2}
+    base.update({"sodium": 230, "fiber": 0.5, "potassium": None, "iron": 4})
+    assert entry_nutrition(base, 1.5, 2) == {
+        "calories": 300.0,
+        "protein": 30.0,
+        "carbs": 60.0,
+        "fat": 6.0,
+        "sodium": 690.0,
+        "fiber": 1.5,
+    }
+
+
+def _with_micros(candidate, **micros):
+    candidate["nutrition"].update(micros)
+    return candidate
+
+
+ALL_MICROS = {"sodium": 230, "potassium": 180, "fiber": 1, "sugar": 1}
+
+
+def test_prefer_micros_ranks_complete_micros_first_among_fitting_options():
+    bare = _candidate("1", "Shake", 160, 30, verified=True)
+    partial = _with_micros(_candidate("2", "Shake", 160, 30), sodium=250)
+    listed = _with_micros(_candidate("3", "Shake", 160, 30), **ALL_MICROS)
+    targets = MacroTargets(min_protein=28)
+
+    plain = rank_candidates([bare, partial, listed], "shake", targets=targets)
+    preferred = rank_candidates(
+        [bare, partial, listed], "shake", targets=targets, prefer_micros=True
+    )
+
+    assert [o["food_id"] for o in plain] == ["1", "2", "3"]
+    assert [o["food_id"] for o in preferred] == ["3", "1", "2"]
+    assert [o["micros_complete"] for o in preferred] == [True, False, False]
+
+
+def test_prefer_micros_never_lifts_an_option_over_a_better_fit():
+    fits = _candidate("1", "Shake", 160, 30)
+    misses = _with_micros(_candidate("2", "Shake", 160, 10), **ALL_MICROS)
+    options = rank_candidates(
+        [misses, fits],
+        "shake",
+        targets=MacroTargets(min_protein=28),
+        prefer_micros=True,
+    )
+    assert [o["food_id"] for o in options] == ["1", "2"]
