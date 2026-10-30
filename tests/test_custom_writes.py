@@ -323,3 +323,16 @@ def test_create_custom_tool_passes_its_arguments(client, monkeypatch):
     )
     assert result["ok"] is True
     assert result["name"] == "Home - Oat bar"
+
+
+def test_create_food_sends_potassium_with_the_other_micros(client):
+    client.session.route("POST", "v2/foods", FakeResponse(json_data=OAT_BAR))
+    nutrition = {**OAT_BAR_NUTRITION, "sodium": 120, "potassium": 300, "sugar": 0}
+    create(client, "food", "Oat bar", nutrition=nutrition)
+    _, _, kwargs = posts(client, "v2/foods")[-1]
+    contents = json.loads(kwargs["data"])["items"][0]["nutritional_contents"]
+    assert (contents["sodium"], contents["potassium"], contents["sugar"]) == (
+        120,
+        300,
+        0,
+    )

@@ -438,7 +438,8 @@ async def fitness_create_custom(
     meal | recipe (plural forms also work).
 
     kind=food: nutrition {calories, protein, carbs, fat, and optionally fiber,
-    sugar, sodium, saturated_fat} in grams (sodium in mg) for one serving of
+    sugar, sodium, potassium, saturated_fat} in grams (sodium and potassium in
+    mg) for one serving of
     serving_size x serving_unit (default 1 x "serving", e.g. 1 x "bar").
     brand is optional.
     kind=meal: saves what is logged in `meal` (breakfast|lunch|dinner|snacks

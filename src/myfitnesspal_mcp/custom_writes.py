@@ -29,7 +29,7 @@ from .mfp_web import (
 )
 
 NUTRIENTS = ("calories", "protein", "carbs", "fat")
-OPTIONAL_NUTRIENTS = ("fiber", "sugar", "sodium", "saturated_fat")
+OPTIONAL_NUTRIENTS = ("fiber", "sugar", "sodium", "potassium", "saturated_fat")
 FIELDS_BY_KIND = {
     "foods": {"nutrition", "brand", "serving_size", "serving_unit"},
     "meals": {"meal", "date"},
