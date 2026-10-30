@@ -3,6 +3,7 @@ from datetime import date
 
 from . import diary, food_search
 from .food_ranking import MacroTargets, normalize_query, rank_candidates
+from .nutrients import DRAFT_MICROS
 
 DEFAULT_MEAL = "breakfast"
 
@@ -52,12 +53,17 @@ def _option_view(option: dict) -> dict:
         "pinned": option["pinned"],
         "fits_targets": option["fits_targets"],
         "micros_complete": option.get("micros_complete", False),
+        "micros_listed": option.get("micros_listed", []),
         "suggested_serving": option["serving_index"],
         "servings": [
             {
                 "serving": index,
                 "label": serving["label"],
                 **serving["nutrition"],
+                **{
+                    nutrient: serving["nutrition"].get(nutrient)
+                    for nutrient in DRAFT_MICROS
+                },
                 "fits_targets": serving["fits_targets"],
             }
             for index, serving in enumerate(option["servings"])

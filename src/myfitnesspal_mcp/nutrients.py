@@ -25,6 +25,22 @@ EXTRA_NUTRIENTS = (
 # 2026-10-29 against search results for a protein shake and a fast-food entree).
 DRAFT_MICROS = ("sodium", "potassium", "fiber", "sugar")
 
+# US restaurant chains publish sodium and fiber but rarely potassium (one of
+# six Panda Express orange chicken entries listed it on 2026-10-29), so
+# requiring potassium would mark nearly every chain entry incomplete.
+COMPLETE_MICROS = ("sodium", "fiber")
+
+
+def micros_listed(nutrition: dict) -> list[str]:
+    return [
+        nutrient for nutrient in DRAFT_MICROS if nutrition.get(nutrient) is not None
+    ]
+
+
+def micros_complete(nutrition: dict) -> bool:
+    return all(nutrition.get(nutrient) is not None for nutrient in COMPLETE_MICROS)
+
+
 # Diary page column headers are MFP abbreviations, lowercased by
 # python-myfitnesspal. Only "Sodium", "Sugar", "Fiber" and the library's own
 # "Potass." have been seen live, so the others match by prefix ("Sat Fat" and

@@ -1,7 +1,7 @@
 import logging
 
 from .mfp_web import get_document, site_url
-from .nutrients import DRAFT_MICROS
+from .nutrients import DRAFT_MICROS, micros_complete, micros_listed
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +166,7 @@ def search_food(
             "protein": None,
             "carbs": None,
             "fat": None,
+            **dict.fromkeys(DRAFT_MICROS),
             "serving": None,
             "verified": None,
             "food_id": result["food_id"],
@@ -177,5 +178,7 @@ def search_food(
             candidate["verified"] = details["verified"]
             if details["serving_sizes"]:
                 candidate["serving"] = serving_label(details["serving_sizes"][0])
+        candidate["micros_complete"] = micros_complete(candidate)
+        candidate["micros_listed"] = micros_listed(candidate)
         candidates.append(candidate)
     return candidates

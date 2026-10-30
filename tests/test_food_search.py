@@ -120,6 +120,25 @@ def test_food_candidates_build_ranking_shape(client):
     assert banana_bread["nutrition"] == {"calories": 196.0}
 
 
+def test_search_candidates_carry_null_micros_and_their_completeness(client):
+    client.food_details[999] = {
+        "calories": 510.0,
+        "verified": True,
+        "nutrition": {"protein": 25.0, "sodium": 850.0, "fiber": 2.0, "sugar": 20.0},
+        "serving_sizes": [{"value": 1, "unit": "serving"}],
+    }
+    listed, unlisted = food_search.search_food(client, "banana", limit=2)
+    assert listed["potassium"] is None
+    assert (listed["sodium"], listed["fiber"]) == (850.0, 2.0)
+    assert listed["micros_complete"] is True
+    assert listed["micros_listed"] == ["sodium", "fiber", "sugar"]
+    assert [unlisted[m] for m in ("sodium", "potassium", "fiber", "sugar")] == [
+        None
+    ] * 4
+    assert unlisted["micros_complete"] is False
+    assert unlisted["micros_listed"] == []
+
+
 def test_food_details_keeps_the_draft_micros_the_food_lists(client):
     client.food_details[999] = {
         "calories": 160.0,

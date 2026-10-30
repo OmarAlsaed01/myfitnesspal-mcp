@@ -170,7 +170,7 @@ def _with_micros(candidate, **micros):
 ALL_MICROS = {"sodium": 230, "potassium": 180, "fiber": 1, "sugar": 1}
 
 
-def test_prefer_micros_ranks_complete_micros_first_among_fitting_options():
+def test_prefer_micros_ranks_options_listing_more_micros_first():
     bare = _candidate("1", "Shake", 160, 30, verified=True)
     partial = _with_micros(_candidate("2", "Shake", 160, 30), sodium=250)
     listed = _with_micros(_candidate("3", "Shake", 160, 30), **ALL_MICROS)
@@ -182,8 +182,28 @@ def test_prefer_micros_ranks_complete_micros_first_among_fitting_options():
     )
 
     assert [o["food_id"] for o in plain] == ["1", "2", "3"]
-    assert [o["food_id"] for o in preferred] == ["3", "1", "2"]
-    assert [o["micros_complete"] for o in preferred] == [True, False, False]
+    assert [o["food_id"] for o in preferred] == ["3", "2", "1"]
+    assert [len(o["micros_listed"]) for o in preferred] == [4, 1, 0]
+
+
+def test_micros_complete_needs_sodium_and_fiber_but_not_potassium():
+    chain = _with_micros(
+        _candidate("1", "Entree", 500, 25), sodium=850, fiber=2, sugar=20
+    )
+    salty = _with_micros(_candidate("2", "Entree", 500, 25), sodium=850, sugar=20)
+    chain_option, salty_option = rank_candidates([chain, salty], "entree")
+    assert chain_option["micros_complete"] is True
+    assert chain_option["micros_listed"] == ["sodium", "fiber", "sugar"]
+    assert salty_option["micros_complete"] is False
+
+
+def test_prefer_micros_keeps_the_pinned_food_on_top():
+    pinned = _candidate("1", "Shake", 160, 30)
+    listed = _with_micros(_candidate("2", "Shake", 160, 30), **ALL_MICROS)
+    options = rank_candidates(
+        [listed, pinned], "shake", pinned_food_id="1", prefer_micros=True
+    )
+    assert [o["food_id"] for o in options] == ["1", "2"]
 
 
 def test_prefer_micros_never_lifts_an_option_over_a_better_fit():

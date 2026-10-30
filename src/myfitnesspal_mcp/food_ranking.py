@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .nutrients import DRAFT_MICROS
+from .nutrients import DRAFT_MICROS, micros_complete, micros_listed
 
 NUTRIENTS = ("calories", "protein", "carbs", "fat")
 
@@ -47,10 +47,6 @@ def entry_nutrition(
         if value is not None:
             scaled[nutrient] = round(value * factor, 1)
     return scaled
-
-
-def micros_complete(base: dict) -> bool:
-    return all(base.get(nutrient) is not None for nutrient in DRAFT_MICROS)
 
 
 def target_shortfall(nutrition: dict, targets: MacroTargets) -> float:
@@ -139,6 +135,7 @@ def rank_candidates(
                 "fits_targets": shortfall == 0.0,
                 "shortfall": shortfall,
                 "micros_complete": micros_complete(candidate.get("nutrition") or {}),
+                "micros_listed": micros_listed(candidate.get("nutrition") or {}),
                 "search_rank": candidate.get("search_rank"),
                 "default_weight_id": candidate.get("default_weight_id"),
                 "serving_index": best_index,
@@ -150,7 +147,7 @@ def rank_candidates(
             not option["pinned"],
             not option["fits_targets"],
             option["shortfall"],
-            prefer_micros and not option["micros_complete"],
+            -len(option["micros_listed"]) if prefer_micros else 0,
             not option["exact_match"],
             not option["verified"],
             option["search_rank"] is None,

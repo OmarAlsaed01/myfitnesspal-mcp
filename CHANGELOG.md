@@ -40,10 +40,12 @@ All notable changes to this project are documented here. The format follows
   `fitness_bulk_export`) include `goals` (calories, protein, carbs, fat) and
   `remaining` (goal minus logged; negative means over the goal).
 - `fitness_draft_food` and `fitness_search_food` show sodium and potassium
-  (mg) and fiber and sugar (g) on each serving where the food lists them, and
-  draft options say whether they list all four (`micros_complete`). The new
-  `prefer_micros` parameter on `fitness_draft_food` ranks those options first
-  among equally good fits.
+  (mg) and fiber and sugar (g), null where the food doesn't list them.
+  Options and candidates name the ones listed (`micros_listed`) and say
+  whether sodium and fiber are both there (`micros_complete`; restaurant
+  chains rarely publish potassium). The new `prefer_micros` parameter on
+  `fitness_draft_food` ranks options listing more of them first among equally
+  good fits, below a remembered food.
 
 ### Changed
 

@@ -483,3 +483,21 @@ def test_draft_food_passes_prefer_micros(connected, monkeypatch):
     monkeypatch.setattr(server.food_logging, "draft_food", fake_draft)
     asyncio.run(server.fitness_draft_food(query="shake", prefer_micros=True))
     assert seen["prefer_micros"] is True
+
+
+def test_log_food_day_carries_goals_and_remaining(connected, local_store):
+    local_store.upsert_nutrition(
+        "2026-07-08",
+        calories=1500.0,
+        protein=100.0,
+        goal_calories=2200.0,
+        goal_protein=160.0,
+    )
+    draft = asyncio.run(
+        server.fitness_draft_food(query="banana", meal="lunch", date="2026-07-08")
+    )
+    result = asyncio.run(server.fitness_log_food(draft_id=draft["draft_id"], option=1))
+    assert result["day"]["goals"]["calories"] == 2200.0
+    assert result["day"]["remaining"]["calories"] == 700.0
+    assert result["day"]["remaining"]["protein"] == 60.0
+    assert result["day"]["remaining"]["fat"] is None

@@ -184,8 +184,9 @@ async def fitness_search_food(
 
     Each candidate has name, brand, calories, macros, serving, and the
     food_id + weight_id to pass to fitness_log_food to log exactly that item.
-    With macros, it also has sodium and potassium (mg) and fiber and sugar (g)
-    where the food lists them.
+    It also has sodium and potassium (mg) and fiber and sugar (g), null where
+    the food doesn't list them or with_macros is false, plus micros_listed and
+    micros_complete as in fitness_draft_food.
     """
 
     def op(store, client):
@@ -219,8 +220,10 @@ async def fitness_draft_food(
 
     Each option lists every serving size with its calories/protein/carbs/fat
     for the whole entry (serving × quantity) and a suggested_serving. Servings
-    also carry sodium and potassium (mg) and fiber and sugar (g) where the food
-    lists them; micros_complete says whether it lists all four. The
+    also carry sodium and potassium (mg) and fiber and sugar (g), null where
+    the food doesn't list them. Each option's micros_listed names the ones it
+    lists, and micros_complete means it lists sodium and fiber (restaurant
+    chains rarely publish potassium). The
     min_/max_ targets (grams; calories in kcal) also apply to the whole
     entry: options that fit come first, near misses follow, flagged
     fits_targets=false. A food you've confirmed before for this query is
@@ -231,8 +234,8 @@ async def fitness_draft_food(
     quantity: multiplies the serving you log, so log the serving that matches
     the amount (see fitness_log_food). date: YYYY-MM-DD (default: today).
     prefer_micros: among options that fit the targets equally well, put
-    those with micros_complete first. Set it when the user tracks sodium,
-    potassium, fiber, or sugar.
+    those listing more of the four first; a remembered food stays on top.
+    Set it when the user tracks sodium, potassium, fiber, or sugar.
     """
     day = parse_day(date)
     targets = MacroTargets(

@@ -104,6 +104,10 @@ def test_unpaired_food_ranks_on_search_listing_calories(client, store):
             "protein": None,
             "carbs": None,
             "fat": None,
+            "sodium": None,
+            "potassium": None,
+            "fiber": None,
+            "sugar": None,
             "fits_targets": True,
         }
     ]
@@ -271,8 +275,10 @@ def test_draft_servings_carry_scaled_micros(banana_details, store):
     assert banana["micros_complete"] is True
     assert (medium["sodium"], medium["potassium"]) == (2.0, 844.0)
     assert (medium["fiber"], medium["sugar"]) == (6.2, 28.8)
+    assert banana["micros_listed"] == ["sodium", "potassium", "fiber", "sugar"]
     assert bread["micros_complete"] is False
-    assert "sodium" not in bread["servings"][0]
+    assert bread["micros_listed"] == []
+    assert bread["servings"][0]["sodium"] is None
 
 
 def test_draft_prefer_micros_moves_the_complete_food_first(banana_details, store):
