@@ -543,3 +543,23 @@ def test_log_batch_that_logs_nothing_skips_the_refresh(connected, monkeypatch):
     assert result["logged_count"] == 0
     assert refreshed == []
     assert "day" not in result
+
+
+def test_log_batch_refreshes_when_every_read_back_failed(
+    connected, monkeypatch, diary_html
+):
+    added = diary_after_add(diary_html)
+
+    def diary_after_the_first_read_fails(calls):
+        if sum(1 for _, url, _ in calls if "food/diary" in url) > 1:
+            raise RuntimeError("diary unavailable")
+        return added(calls)
+
+    connected.session.route("GET", "food/diary?date=", diary_after_the_first_read_fails)
+    refreshed = []
+    monkeypatch.setattr(
+        server.sync, "refresh_day", lambda store, client, day: refreshed.append(day)
+    )
+    result = asyncio.run(server.fitness_log_batch(micros={"sodium": 100}))
+    assert (result["logged_count"], result["sent_count"]) == (0, 1)
+    assert len(refreshed) == 1

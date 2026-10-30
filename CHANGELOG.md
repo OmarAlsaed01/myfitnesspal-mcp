@@ -69,7 +69,7 @@ All notable changes to this project are documented here. The format follows
   `macros` and `micros` amounts logged as servings of one-gram (one-mg) unit
   foods, which `MFP_UNIT_FOODS` can override. Every add is still checked
   against the diary, one failing entry doesn't stop the rest, and the day is
-  refreshed once at the end.
+  refreshed once at the end, whenever anything was sent.
 
 ### Changed
 

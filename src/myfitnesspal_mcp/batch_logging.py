@@ -180,38 +180,51 @@ def log_batch(
     # Read before anything is posted, so an expired session fails here, where
     # the auth retry can safely re-run the whole batch.
     page = diary.diary_page(client, day)
-    results = []
+    results, sent = [], 0
     for entry in planned:
-        result, page = _log_entry(client, resolver, day, meal, entry, page)
+        result, page, was_sent = _log_entry(client, resolver, day, meal, entry, page)
         results.append(result)
+        sent += was_sent
     logged = sum(1 for result in results if result["ok"])
     return {
         "date": day.isoformat(),
         "meal": meal,
         "logged_count": logged,
         "failed_count": len(results) - logged,
+        "sent_count": sent,
         "results": results,
     }
 
 
 def _log_entry(
     client, resolver: _Resolver, day: date, meal: str, entry: dict, page: tuple | None
-) -> tuple[dict, tuple | None]:
+) -> tuple[dict, tuple | None, bool]:
     """Never raises: once anything is posted, an exception reaching the auth
-    retry would re-run the batch and add every earlier food again."""
+    retry would re-run the batch and add every earlier food again. Also says
+    whether the add was sent, since a failed read-back may still have logged
+    the food and the caller should refresh the day for it."""
     entry_meal = entry.get("meal") or meal
+    sent = False
     try:
         if entry["source"] == "unit":
             food, quantity, draft_pin = entry["food"], entry["quantity"], None
         else:
             food, quantity, draft_pin = resolver.food(entry)
+        sent = True
         result, page = food_logging.log_exact_reading_back(
             client, food, day, entry_meal, quantity=float(quantity), page=page
         )
     except Exception as exc:
         logger.warning("batch entry %s failed: %s", entry["label"], exc)
         # After a failure the next add reads the diary afresh.
-        return {"entry": entry["label"], "ok": False, "error": str(exc)}, None
+        return {"entry": entry["label"], "ok": False, "error": str(exc)}, None, sent
+    logged = {"entry": entry["label"], "ok": True, **result}
     if draft_pin:
-        food_logging.pin_draft_choice(resolver.store, *draft_pin, result)
-    return {"entry": entry["label"], "ok": True, **result}, page
+        try:
+            food_logging.pin_draft_choice(resolver.store, *draft_pin, result)
+        except Exception as exc:
+            logger.warning(
+                "batch entry %s logged but not pinned: %s", entry["label"], exc
+            )
+            logged["pin_warning"] = f"logged, but remembering the choice failed: {exc}"
+    return logged, page, True

@@ -407,7 +407,7 @@ async def fitness_log_batch(
         )
 
     result = await with_session(ctx, op)
-    if not result["logged_count"]:
+    if not result["sent_count"]:
         return {"ok": True, **result}
     return await day_after_write(ctx, day, result)
 
