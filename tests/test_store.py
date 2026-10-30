@@ -426,17 +426,10 @@ def test_day_record_of_an_unknown_day_has_no_goals():
     assert set(record["remaining"].values()) == {None}
 
 
-def test_day_record_adds_exercise_back_to_remaining_calories(store):
+def test_day_record_shows_exercise_without_adding_it_to_remaining(store):
     store.upsert_nutrition(
         "2026-07-08", calories=2000.0, goal_calories=2200.0, exercise_calories=150.0
     )
     record = store.day_record("2026-07-08")
+    assert record["nutrition"]["exercise_calories"] == 150.0
     assert record["remaining"]["calories"] == 200.0
-    assert record["calories_remaining_with_exercise"] == 350.0
-
-
-def test_day_record_leaves_remaining_with_exercise_null_when_exercise_unknown(store):
-    store.upsert_nutrition("2026-07-08", calories=2000.0, goal_calories=2200.0)
-    assert store.day_record("2026-07-08")["calories_remaining_with_exercise"] is None
-    store.upsert_nutrition("2026-07-08", exercise_calories=0.0)
-    assert store.day_record("2026-07-08")["calories_remaining_with_exercise"] == 200.0

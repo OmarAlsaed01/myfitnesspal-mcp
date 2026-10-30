@@ -157,11 +157,9 @@ async def fitness_get_day(
     null where MyFitnessPal has no goal. Goals also carry each of the 13
     nutrients above that the account has a goal for, in the same units; their
     remaining is null while the day's total is unknown (see all_nutrients).
-    `remaining` matches the web diary's Remaining row, which doesn't add
-    exercise. nutrition.exercise_calories is the day's exercise-diary total,
-    and calories_remaining_with_exercise (calorie remaining plus exercise)
-    matches the MyFitnessPal app's "remaining"; use it when the user asks how
-    many calories they have left.
+    `remaining` doesn't add exercise back, matching the web diary and the
+    app with its Exercise Calories setting off. nutrition.exercise_calories is
+    the day's exercise-diary total, for reference.
 
     date: YYYY-MM-DD (default: today).
     all_nutrients: also fetch the day totals of those 13 nutrients that the
