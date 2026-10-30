@@ -198,6 +198,23 @@ def log_exact(
     quantity: float,
     page: tuple | None = None,
 ) -> dict:
+    result, _ = log_exact_reading_back(
+        client, food, day, meal, quantity=quantity, page=page
+    )
+    return result
+
+
+def log_exact_reading_back(
+    client,
+    food: dict,
+    day: date,
+    meal: str,
+    *,
+    quantity: float,
+    page: tuple | None = None,
+) -> tuple[dict, tuple]:
+    """log_exact, also returning the diary page read back after the add, which
+    is the page the next add to the same day can start from."""
     page = page or diary.diary_page(client, day)
     diary.push_food(
         client,
@@ -212,7 +229,7 @@ def log_exact(
     # food logs that food, and one that matches nothing logs nothing. Reading the
     # diary back is the only way to know what was added.
     try:
-        after, _ = diary.diary_page(client, day)
+        after_page = diary.diary_page(client, day)
     except Exception as exc:
         # The food may already be in the diary. An auth-class error here would
         # make run_with_refresh re-run the whole op and post /food/add again, so
@@ -224,7 +241,7 @@ def log_exact(
             f"it ({type(exc).__name__}). Look at the day with fitness_get_day "
             "before logging it again, or it may be added twice."
         ) from exc
-    added = _added_entries(page[0], after)
+    added = _added_entries(page[0], after_page[0])
     if not added:
         raise NothingLogged(
             f"MyFitnessPal accepted {food['name']!r} (food_id {food['food_id']}, "
@@ -241,27 +258,40 @@ def log_exact(
         "quantity": quantity,
         "meal": meal,
         "date": day.isoformat(),
-    }
+    }, after_page
 
 
-def _log_option(
-    client,
-    option: dict,
-    serving: int | None,
-    day: date,
-    *,
-    meal: str,
-    quantity: float,
-    page: tuple | None,
-) -> dict:
+def option_food(option: dict, serving: int | None) -> dict:
     weight_id, label = _chosen_serving(option, serving)
-    food = {
+    return {
         "food_id": option["food_id"],
         "weight_id": weight_id,
         "name": option["name"],
         "serving": label,
     }
-    return log_exact(client, food, day, meal, quantity=quantity, page=page)
+
+
+def draft_option(store, draft_id: str, option: int) -> tuple[dict, dict]:
+    body = store.draft(draft_id)
+    if body is None:
+        raise DraftNotFound(
+            f"draft {draft_id!r} not found or expired (drafts last 24 hours); "
+            "call fitness_draft_food again"
+        )
+    options = body["options"]
+    if not 1 <= option <= len(options):
+        raise ValueError(f"option must be between 1 and {len(options)}")
+    return body, options[option - 1]
+
+
+def pin_draft_choice(store, body: dict, chosen: dict, result: dict) -> None:
+    store.set_pin(
+        body["query"],
+        chosen["food_id"],
+        result["weight_id"],
+        chosen["name"],
+        result["serving"],
+    )
 
 
 def log_from_draft(
@@ -277,40 +307,24 @@ def log_from_draft(
     pin: bool = True,
     page: tuple | None = None,
 ) -> dict:
-    body = store.draft(draft_id)
-    if body is None:
-        raise DraftNotFound(
-            f"draft {draft_id!r} not found or expired (drafts last 24 hours); "
-            "call fitness_draft_food again"
-        )
-    options = body["options"]
-    if not 1 <= option <= len(options):
-        raise ValueError(f"option must be between 1 and {len(options)}")
-    chosen = options[option - 1]
-    result = _log_option(
+    body, chosen = draft_option(store, draft_id, option)
+    result = log_exact(
         client,
-        chosen,
-        serving,
+        option_food(chosen, serving),
         day or date.fromisoformat(body["day"]),
-        meal=meal or body["meal"],
+        meal or body["meal"],
         quantity=body["quantity"] if quantity is None else quantity,
         page=page,
     )
     if pin:
-        store.set_pin(
-            body["query"],
-            chosen["food_id"],
-            result["weight_id"],
-            chosen["name"],
-            result["serving"],
-        )
+        pin_draft_choice(store, body, chosen, result)
     return {**result, "source": "draft", "pinned": pin}
 
 
 BARE_QUERY_LIMIT = 10
 
 
-def _unambiguous_food(
+def unambiguous_food(
     client, store, query: str
 ) -> tuple[dict | None, list[dict] | None]:
     pin = store.pin(query)
@@ -345,7 +359,7 @@ def _unambiguous_food(
 def log_by_query(
     client, store, query: str, day: date, *, meal: str, quantity: float
 ) -> dict:
-    food, search_results = _unambiguous_food(client, store, query)
+    food, search_results = unambiguous_food(client, store, query)
     if food:
         result = log_exact(client, food, day, meal, quantity=quantity)
         return {**result, "source": food["source"]}
@@ -411,7 +425,7 @@ def modify_food(
         )
     replacement_query = new_query or query
     chosen_quantity = 1.0 if quantity is None else quantity
-    food, search_results = _unambiguous_food(client, store, replacement_query)
+    food, search_results = unambiguous_food(client, store, replacement_query)
     if food is None:
         draft_id, body = _build_draft(
             client,

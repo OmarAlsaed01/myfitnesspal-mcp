@@ -64,6 +64,12 @@ All notable changes to this project are documented here. The format follows
   exact name. It deletes nothing when it can't tell which item a name means.
 - Food log results include `added_entries`: the diary entries MyFitnessPal
   actually added, read back from the diary.
+- `fitness_log_batch` logs several foods to one day in a single call:
+  draft choices, exact ids, remembered foods, and custom items, plus
+  `macros` and `micros` amounts logged as servings of one-gram (one-mg) unit
+  foods, which `MFP_UNIT_FOODS` can override. Every add is still checked
+  against the diary, one failing entry doesn't stop the rest, and the day is
+  refreshed once at the end.
 
 ### Changed
 

@@ -38,6 +38,10 @@ def username_env() -> str | None:
     return os.environ.get("MFP_USERNAME")
 
 
+def unit_foods_env() -> str | None:
+    return os.environ.get("MFP_UNIT_FOODS")
+
+
 def impersonate() -> str:
     return os.environ.get("MFP_IMPERSONATE", "chrome")
 

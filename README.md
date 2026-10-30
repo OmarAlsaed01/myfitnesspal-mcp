@@ -168,6 +168,7 @@ Then use the same `--from 'mfp-mcp[autorefresh]'` form in your client config
 | `fitness_search_food` | Candidate matches with brand, calories, macros, sodium/potassium/fiber/sugar where listed, serving, and ids (including the `external_id` recipes take) |
 | `fitness_draft_food` | Numbered options with every serving size and its sodium/potassium/fiber/sugar where listed, filtered/ranked by optional calorie and macro targets (`prefer_micros` ranks foods listing more of them first) |
 | `fitness_log_food` | Log a draft option (and serving), a remembered food, or exact ids to the real diary |
+| `fitness_log_batch` | Log several foods in one call (draft choices, ids, remembered foods, custom items, and `macros`/`micros` amounts as one-gram unit foods), refreshing the day once |
 | `fitness_list_food_pins` | Remembered query → food/serving choices (local) |
 | `fitness_clear_food_pin` | Forget one remembered choice, or all of them |
 | `fitness_delete_food` | Remove a diary entry by name match |
@@ -258,6 +259,7 @@ an authenticating reverse proxy, or an OAuth-aware MCP gateway.
 | `MFP_USERNAME` | Your MFP username (not email); only needed if profile lookup fails | auto-detected |
 | `MFP_IMPERSONATE` | curl_cffi browser fingerprint (try `chrome124` on 403s) | `chrome` |
 | `MFP_SYNC_DAYS` | Gap-fill lookback window in days | `30` |
+| `MFP_UNIT_FOODS` | JSON pointing `fitness_log_batch`'s macro/micro unit foods elsewhere, e.g. `{"fiber": {"food_id": "1", "weight_id": "2"}}` | built-in public foods |
 | `MFP_MCP_DATA_DIR` | Where the SQLite cache + browser profile live | platform data dir |
 
 ## Troubleshooting

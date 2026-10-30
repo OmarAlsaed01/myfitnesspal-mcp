@@ -2,6 +2,7 @@ import asyncio
 import datetime
 
 import pytest
+from conftest import diary_after_add
 from myfitnesspal.exceptions import MyfitnesspalLoginError
 
 from myfitnesspal_mcp import mfp_client, server
@@ -503,3 +504,42 @@ def test_log_food_day_carries_goals_and_remaining(connected, local_store):
     assert result["day"]["remaining"]["calories"] == 700.0
     assert result["day"]["remaining"]["protein"] == 60.0
     assert result["day"]["remaining"]["fat"] is None
+
+
+def test_log_batch_refreshes_the_day_once_and_returns_it(
+    connected, local_store, monkeypatch, diary_html
+):
+    connected.session.route("GET", "food/diary?date=", diary_after_add(diary_html))
+    refreshed = []
+    monkeypatch.setattr(
+        server.sync, "refresh_day", lambda store, client, day: refreshed.append(day)
+    )
+    local_store.upsert_nutrition("2026-07-08", goal_calories=2200.0)
+
+    result = asyncio.run(
+        server.fitness_log_batch(
+            meal="dinner",
+            date="2026-07-08",
+            macros={"protein": 42, "carbs": 80, "fat": 16},
+            micros={"sodium": 2200, "potassium": 700, "fiber": 5, "sugar": 10},
+        )
+    )
+
+    assert result["ok"] is True
+    assert (result["logged_count"], result["failed_count"]) == (7, 0)
+    assert refreshed == [datetime.date(2026, 7, 8)]
+    assert result["day"]["goals"]["calories"] == 2200.0
+    assert "remaining" in result["day"]
+
+
+def test_log_batch_that_logs_nothing_skips_the_refresh(connected, monkeypatch):
+    refreshed = []
+    monkeypatch.setattr(
+        server.sync, "refresh_day", lambda store, client, day: refreshed.append(day)
+    )
+    result = asyncio.run(
+        server.fitness_log_batch(items=[{"draft_id": "gone", "option": 1}])
+    )
+    assert result["logged_count"] == 0
+    assert refreshed == []
+    assert "day" not in result

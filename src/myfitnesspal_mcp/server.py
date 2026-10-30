@@ -7,6 +7,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from . import (
+    batch_logging,
     custom_delete,
     custom_items,
     custom_writes,
@@ -357,6 +358,58 @@ async def fitness_log_food(
     return await day_after_write(
         ctx, datetime.date.fromisoformat(result["date"]), result
     )
+
+
+@mcp.tool(title="Log several foods", annotations=ADDS_TO_MFP)
+async def fitness_log_batch(
+    items: list[dict] | None = None,
+    meal: str = food_logging.DEFAULT_MEAL,
+    date: str | None = None,
+    macros: dict | None = None,
+    micros: dict | None = None,
+    pin: bool = True,
+    ctx: Context = None,
+) -> dict:
+    """Log several foods to one day in a single call, refreshing the day once
+    at the end instead of after every food. Prefer it over repeated
+    fitness_log_food calls when logging a whole meal.
+
+    items: a list, each exactly one of
+    - {draft_id, option, serving?, quantity?}: a fitness_draft_food choice
+      (quantity defaults to the draft's; pin=True remembers it)
+    - {food_id, weight_id, name?, quantity?}: exact ids from fitness_search_food
+    - {query, quantity?}: a remembered food or the single exact-name match;
+      anything ambiguous is skipped with an error rather than guessed
+    - {custom, kind?, serving?, quantity?}: one of your custom foods, saved
+      meals or recipes by name, as fitness_log_custom takes it
+    Any item may set its own meal. quantity multiplies the serving (default 1).
+
+    macros {protein, carbs, fat} (g) and micros {sodium, potassium} (mg) and
+    {fiber, sugar} (g) log that many servings of a one-gram (one-mg) unit food
+    per nutrient, for an estimated meal with no matching food. Zero or missing
+    amounts are skipped. The unit foods are public MyFitnessPal foods; the
+    MFP_UNIT_FOODS environment variable can point any nutrient at another one.
+
+    meal: breakfast|lunch|dinner|snacks (default breakfast) or any meal name
+    on the account. date: YYYY-MM-DD (default today); every entry goes to it.
+
+    Each entry is checked by reading the diary back. One that fails doesn't
+    stop the rest: `results` lists each with ok, what was added
+    (added_entries), or the error. An error saying the diary could not be read
+    back means that food may be logged; check before logging it again. Returns
+    the updated day under `day`, shaped like fitness_get_day.
+    """
+    day = parse_day(date)
+
+    def op(store, client):
+        return batch_logging.log_batch(
+            client, store, day, meal, items, macros=macros, micros=micros, pin=pin
+        )
+
+    result = await with_session(ctx, op)
+    if not result["logged_count"]:
+        return {"ok": True, **result}
+    return await day_after_write(ctx, day, result)
 
 
 @mcp.tool(title="List your custom items", annotations=READS_MFP)
