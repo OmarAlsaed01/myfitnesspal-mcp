@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS day_nutrition (
     diary_synced INTEGER NOT NULL DEFAULT 0,
     goal_protein REAL,
     goal_carbs REAL,
-    goal_fat REAL{_EXTRA_NUTRIENT_COLUMNS}
+    goal_fat REAL,
+    exercise_calories REAL{_EXTRA_NUTRIENT_COLUMNS}
 );
 CREATE TABLE IF NOT EXISTS diary_entry (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,6 +86,7 @@ NUTRITION_FIELDS = (
     "goal_protein",
     "goal_carbs",
     "goal_fat",
+    "exercise_calories",
     *EXTRA_NUTRIENTS,
 )
 
@@ -111,6 +113,7 @@ ADDED_NUTRITION_COLUMNS = {
     "goal_protein": "REAL",
     "goal_carbs": "REAL",
     "goal_fat": "REAL",
+    "exercise_calories": "REAL",
 }
 
 TREND_COLUMNS = {
@@ -432,11 +435,17 @@ class Store:
         remaining = {
             name: _remaining(goal, logged, name) for name, goal in goals.items()
         }
+        exercise_calories = logged.get("exercise_calories")
         return {
             "day": day,
             "nutrition": nutrition,
             "goals": goals,
             "remaining": remaining,
+            "calories_remaining_with_exercise": (
+                None
+                if remaining["calories"] is None or exercise_calories is None
+                else round(remaining["calories"] + exercise_calories, 1)
+            ),
             "diary": self.diary(day),
             "note": self.note(day),
             "feel": self.feel(day),

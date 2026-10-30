@@ -3,7 +3,7 @@ from datetime import date
 from lxml import html as lh
 
 from .entry_matching import find_entries, no_matching_entry, resolve_entry
-from .mfp_web import get_page, post_legacy_delete, site_url
+from .mfp_web import get_document, get_page, post_legacy_delete, site_url
 
 ALL_MATCHES_ADVICE = (
     "Use a more specific query to pick one, or pass all_matches=True to remove "
@@ -69,6 +69,15 @@ def exercise_entries(doc) -> list[dict]:
                     entry[key] = _cell_number(cell)
             entries.append(entry)
     return entries
+
+
+def calories_burned(client, day: date) -> float:
+    """The exercise calories the MyFitnessPal app adds back to the day's
+    remaining (the web diary's Remaining row doesn't). Strength rows have no
+    calories column, so they add nothing."""
+    doc = get_document(client, _exercise_diary_url(client, day))
+    total = sum(entry.get("calories_burned") or 0.0 for entry in exercise_entries(doc))
+    return round(total, 1)
 
 
 def remove_exercise_entry(client, entry_id: str, token: str) -> None:

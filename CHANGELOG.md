@@ -51,6 +51,11 @@ All notable changes to this project are documented here. The format follows
   nutrient goals, with `remaining` for each once the day's total is known.
   They're fetched about once per goal period and cached in a new
   `goal_period` table.
+- Day records carry the day's exercise calories (`nutrition.exercise_calories`,
+  from the exercise diary) and `calories_remaining_with_exercise`, which
+  matches the MyFitnessPal app's remaining. `remaining` still matches the web
+  diary, which doesn't add exercise. Refreshing a day reads the exercise
+  diary too, one more request per day.
 
 ### Changed
 

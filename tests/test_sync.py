@@ -476,3 +476,9 @@ def test_refresh_day_survives_a_failed_goals_fetch(store, caplog):
     assert store.goal_period(TODAY.isoformat()) is None
     assert store.nutrition(TODAY.isoformat())["calories"] == 2100.0
     assert "nutrient goals fetch" in caplog.text
+
+
+def test_refresh_day_stores_exercise_calories(store, monkeypatch):
+    monkeypatch.setattr(sync.exercise, "calories_burned", lambda client, day: 230.0)
+    sync.refresh_day(store, FakeSyncClient(), TODAY)
+    assert store.nutrition(TODAY.isoformat())["exercise_calories"] == 230.0
