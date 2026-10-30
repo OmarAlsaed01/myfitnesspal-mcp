@@ -3,14 +3,7 @@ import threading
 from contextlib import contextmanager
 from datetime import date, timedelta
 
-from . import (
-    config,
-    exercise,
-    measurements,
-    notes,
-    nutrient_goals,
-    nutrient_reports,
-)
+from . import config, measurements, notes, nutrient_goals, nutrient_reports
 from .mfp_client import is_auth_error
 from .nutrients import EXTRA_NUTRIENTS, diary_column_nutrient
 from .store import Store
@@ -105,11 +98,6 @@ def refresh_day(store: Store, client, day: date) -> None:
 
     with tolerating_failures(f"nutrient goals fetch for {day}"):
         refresh_goal_period(store, client, day, mfp_day.goals or {})
-
-    with tolerating_failures(f"exercise fetch for {day}"):
-        store.upsert_nutrition(
-            key, exercise_calories=exercise.calories_burned(client, day)
-        )
 
     store.mark_diary_synced(key)
 

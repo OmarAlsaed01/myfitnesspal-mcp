@@ -147,14 +147,3 @@ def test_identical_exercise_rows_resolve_to_one():
 def test_delete_exercise_is_case_insensitive(exercise_client):
     result = exercise.delete_exercise(exercise_client, TODAY, "PULL UP")
     assert result["removed"][0]["entry_id"] == "555"
-
-
-def test_calories_burned_sums_cardio_and_ignores_strength(exercise_client):
-    assert (
-        exercise.calories_burned(exercise_client, datetime.date(2026, 7, 8)) == 1239.0
-    )
-    [(method, url, _)] = exercise_client.session.calls
-    assert (method, url) == (
-        "GET",
-        "https://www.myfitnesspal.com/exercise/diary/tester?date=2026-07-08",
-    )
