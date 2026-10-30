@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS food_draft (
     created_at TEXT NOT NULL,
     body TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS goal_period (
+    valid_from TEXT PRIMARY KEY,
+    valid_to TEXT NOT NULL,
+    fetched_on TEXT NOT NULL,
+    body TEXT NOT NULL
+);
 """
 
 DRAFT_LIFETIME = timedelta(hours=24)
@@ -142,6 +148,14 @@ def _without_unknown_extras(row: sqlite3.Row) -> dict:
         for column, value in dict(row).items()
         if value is not None or column not in EXTRA_NUTRIENTS
     }
+
+
+def _remaining(goal: float | None, logged: dict, name: str) -> float | None:
+    """A hidden nutrient's total is unknown rather than zero, so its remaining
+    is too."""
+    if goal is None or (name in EXTRA_NUTRIENTS and logged.get(name) is None):
+        return None
+    return round(goal - (logged.get(name) or 0.0), 1)
 
 
 def _extra_nutrient_column(nutrient: str) -> str:
@@ -358,10 +372,57 @@ class Store:
             "WHERE day = ?",
             (day,),
         ).fetchone()
-        return {
+        goals = {
             name: (row[column] if row is not None else None)
             for name, column in GOAL_COLUMNS.items()
         }
+        period = self.goal_period(day)
+        if period is not None:
+            weekday_goals = period["goals"][date.fromisoformat(day).weekday()]
+            goals.update(
+                {
+                    nutrient: weekday_goals[nutrient]
+                    for nutrient in EXTRA_NUTRIENTS
+                    if weekday_goals.get(nutrient) is not None
+                }
+            )
+        return goals
+
+    @_serialized
+    def goal_period(self, day: str) -> dict | None:
+        row = self.conn.execute(
+            "SELECT valid_from, valid_to, fetched_on, body FROM goal_period "
+            "WHERE valid_from <= ? AND valid_to >= ? ORDER BY valid_from DESC LIMIT 1",
+            (day, day),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "valid_from": row["valid_from"],
+            "valid_to": row["valid_to"],
+            "fetched_on": row["fetched_on"],
+            "goals": json.loads(row["body"]),
+        }
+
+    @_serialized
+    def save_goal_period(self, period: dict, fetched_on: str) -> None:
+        """A goal change in MFP shortens the period before it, so cached
+        periods overlapping the new one are dropped rather than trusted."""
+        self.conn.execute(
+            "DELETE FROM goal_period WHERE valid_from <= ? AND valid_to >= ?",
+            (period["valid_to"], period["valid_from"]),
+        )
+        self.conn.execute(
+            "INSERT INTO goal_period (valid_from, valid_to, fetched_on, body) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                period["valid_from"],
+                period["valid_to"],
+                fetched_on,
+                json.dumps(period["goals"]),
+            ),
+        )
+        self.conn.commit()
 
     @_serialized
     def day_record(self, day: str) -> dict:
@@ -369,8 +430,7 @@ class Store:
         goals = self.goals(day)
         logged = nutrition or {}
         remaining = {
-            name: None if goal is None else round(goal - (logged.get(name) or 0.0), 1)
-            for name, goal in goals.items()
+            name: _remaining(goal, logged, name) for name, goal in goals.items()
         }
         return {
             "day": day,

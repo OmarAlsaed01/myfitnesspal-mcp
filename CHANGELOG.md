@@ -46,6 +46,11 @@ All notable changes to this project are documented here. The format follows
   chains rarely publish potassium). The new `prefer_micros` parameter on
   `fitness_draft_food` ranks options listing more of them first among equally
   good fits, below a remembered food.
+- Day goals also carry every nutrient goal the account sets beyond calories
+  and macros (sodium, fiber, saturated fat, and so on), from MyFitnessPal's
+  nutrient goals, with `remaining` for each once the day's total is known.
+  They're fetched about once per goal period and cached in a new
+  `goal_period` table.
 
 ### Changed
 

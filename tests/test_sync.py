@@ -469,3 +469,10 @@ def test_poll_skips_bad_days_without_auth_errors(store):
     client = FlakyClient()
     sync.poll(store, client, days=2, force=True)
     assert len(client.fetched) == 2
+
+
+def test_refresh_day_survives_a_failed_goals_fetch(store, caplog):
+    sync.refresh_day(store, FakeSyncClient(), TODAY)
+    assert store.goal_period(TODAY.isoformat()) is None
+    assert store.nutrition(TODAY.isoformat())["calories"] == 2100.0
+    assert "nutrient goals fetch" in caplog.text

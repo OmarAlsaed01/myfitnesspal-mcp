@@ -3,7 +3,7 @@ import threading
 from contextlib import contextmanager
 from datetime import date, timedelta
 
-from . import config, measurements, notes, nutrient_reports
+from . import config, measurements, notes, nutrient_goals, nutrient_reports
 from .mfp_client import is_auth_error
 from .nutrients import EXTRA_NUTRIENTS, diary_column_nutrient
 from .store import Store
@@ -96,7 +96,42 @@ def refresh_day(store: Store, client, day: date) -> None:
     with tolerating_failures(f"note fetch for {day}"):
         store.set_note(key, notes.get_note(client, day))
 
+    with tolerating_failures(f"nutrient goals fetch for {day}"):
+        refresh_goal_period(store, client, day, mfp_day.goals or {})
+
     store.mark_diary_synced(key)
+
+
+def _goal_period_current(
+    period: dict, day: date, diary_goals: dict, today: date
+) -> bool:
+    """An open-ended period stays open only until the user changes a goal, so
+    it is trusted for the day it was fetched. Either way, macro goals that no
+    longer match the diary page mean the goals changed since."""
+    if period["valid_to"] >= today.isoformat() > period["fetched_on"]:
+        return False
+    cached = period["goals"][day.weekday()]
+    for name, fields in (
+        ("protein", ("protein",)),
+        ("carbs", ("carbohydrates", "carbs")),
+        ("fat", ("fat",)),
+    ):
+        shown = first_number(diary_goals, *fields)
+        if shown is not None and abs((cached.get(name) or 0.0) - shown) >= 0.5:
+            return False
+    return True
+
+
+def refresh_goal_period(
+    store: Store, client, day: date, diary_goals: dict, *, today: date | None = None
+) -> None:
+    today = today or date.today()
+    period = store.goal_period(day.isoformat())
+    if period is not None and _goal_period_current(period, day, diary_goals, today):
+        return
+    store.save_goal_period(
+        nutrient_goals.goal_period(client, day), fetched_on=today.isoformat()
+    )
 
 
 def fill_hidden_nutrients(

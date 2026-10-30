@@ -154,7 +154,11 @@ async def fitness_get_day(
 
     `goals` are the day's MyFitnessPal targets (calories, protein, carbs, fat)
     and `remaining` is goal minus what is logged (negative: over the goal);
-    null where MyFitnessPal has no goal.
+    null where MyFitnessPal has no goal. Goals also carry each of the 13
+    nutrients above that the account has a goal for, in the same units; their
+    remaining is null while the day's total is unknown (see all_nutrients).
+    `remaining` doesn't add exercise calories, so it can differ from the
+    MyFitnessPal app's "remaining" on days with exercise logged.
 
     date: YYYY-MM-DD (default: today).
     all_nutrients: also fetch the day totals of those 13 nutrients that the
